@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+package nodalcore.v1;
+
+option java_package = "io.nodalcore.v1";
+option java_multiple_files = true;
+
+// ---------------------------------------------------------------------------
+// Common types
+// ---------------------------------------------------------------------------
+
+message SettingValue {
+  oneof value {
+    string  string_value  = 1;
+    double  number_value  = 2;
+    bool    bool_value    = 3;
+    bytes   bytes_value   = 4;
+  }
+}
+
+message SettingsMap {
+  map<string, SettingValue> entries = 1;
+}
+
+// ---------------------------------------------------------------------------
+// NodalSettings — read/write device or tool settings
+// ---------------------------------------------------------------------------
+
+service NodalSettings {
+  // Read all current settings from the plugin/device.
+  rpc ReadSettings  (ReadSettingsRequest)  returns (ReadSettingsResponse);
+
+  // Write a partial settings map to the plugin/device.
+  rpc WriteSettings (WriteSettingsRequest) returns (WriteSettingsResponse);
+
+  // Return the JSON Schema 7 for this plugin's settings as a JSON string.
+  rpc GetSchema     (GetSchemaRequest)     returns (GetSchemaResponse);
+}
+
+message ReadSettingsRequest  { string plugin_id = 1; }
+message ReadSettingsResponse { SettingsMap settings = 1; }
+
+message WriteSettingsRequest {
+  string      plugin_id = 1;
+  SettingsMap settings  = 2;
+}
+message WriteSettingsResponse {
+  bool   success = 1;
+  string message = 2;   // human-readable status or error detail
+}
+
+message GetSchemaRequest  { string plugin_id = 1; }
+message GetSchemaResponse { string schema_json = 1; }
+
+// ---------------------------------------------------------------------------
+// NodalEvents — real-time event stream from a plugin/device
+// ---------------------------------------------------------------------------
+
+service NodalEvents {
+  // Server-streaming RPC: subscribe to a continuous stream of events.
+  rpc Subscribe (SubscribeRequest) returns (stream Event);
+}
+
+message SubscribeRequest {
+  string plugin_id  = 1;
+  // Optional list of event types to filter. Empty = all events.
+  repeated string event_types = 2;
+}
+
+message Event {
+  string   plugin_id  = 1;
+  string   type       = 2;   // e.g. "settings_changed", "device_disconnected"
+  string   payload    = 3;   // JSON-encoded event payload
+  int64    timestamp  = 4;   // Unix epoch milliseconds
+}

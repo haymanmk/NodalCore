@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "module": "esnext",
+    "target": "es2022",
+    "resolveJsonModule": true,
+    "composite": false,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "paths": {
+      "@nodalcore/sdk": ["./packages/sdk/src/index.ts"],
+      "@nodalcore/sdk/*": ["./packages/sdk/src/*"],
+      "@nodalcore/renderer": ["./packages/renderer/src/index.ts"],
+      "@nodalcore/renderer/*": ["./packages/renderer/src/*"],
+      "@nodalcore/plugin-host": ["./packages/plugin-host/src/index.ts"],
+      "@nodalcore/plugin-host/*": ["./packages/plugin-host/src/*"],
+      "@nodalcore/registry-client": ["./packages/registry-client/src/index.ts"],
+      "@nodalcore/registry-client/*": ["./packages/registry-client/src/*"]
+    }
+  },
+  "exclude": ["**/node_modules", "**/dist"]
+}

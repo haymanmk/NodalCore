@@ -1,0 +1,19 @@
+{
+  "name": "example-multimeter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --outDir dist",
+    "dev": "tsup src/index.ts --format esm --dts --outDir dist --watch"
+  },
+  "dependencies": {
+    "@nodalcore/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/json-schema": "^7.0.15",
+    "tsup": "^8.0.0",
+    "typescript": "^5.7.0"
+  }
+}

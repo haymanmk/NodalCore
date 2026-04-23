@@ -1,0 +1,12 @@
+{
+  "name": "example-image-processor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node bin/tool.js"
+  },
+  "dependencies": {
+    "@nodalcore/sdk": "workspace:*"
+  }
+}

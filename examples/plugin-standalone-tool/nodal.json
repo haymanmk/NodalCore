@@ -1,0 +1,40 @@
+{
+  "id": "example-image-processor",
+  "name": "Example Image Processor",
+  "version": "0.1.0",
+  "sdkVersion": "0.1.0",
+  "type": "standalone-tool",
+  "executable": "./bin/tool.js",
+  "icon": "icon.png",
+  "settingsSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "outputFormat": {
+        "type": "string",
+        "title": "Output Format",
+        "enum": ["png", "jpeg", "webp"],
+        "default": "png"
+      },
+      "quality": {
+        "type": "integer",
+        "title": "Quality (%)",
+        "minimum": 1,
+        "maximum": 100,
+        "default": 85
+      },
+      "maxWidth": {
+        "type": "integer",
+        "title": "Max Width (px)",
+        "minimum": 1,
+        "default": 1920
+      }
+    },
+    "required": ["outputFormat", "quality"]
+  },
+  "permissions": ["filesystem"],
+  "author": "NodalCore Team",
+  "description": "Example standalone-tool plugin demonstrating an out-of-process image processor.",
+  "repository": "https://github.com/nodalcore/example-image-processor",
+  "tags": ["example", "image", "processing", "standalone"]
+}

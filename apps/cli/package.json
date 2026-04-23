@@ -1,0 +1,30 @@
+{
+  "name": "@nodalcore/cli",
+  "version": "0.1.0",
+  "description": "NodalCore CLI — headless plugin management, REPL, and MCP server",
+  "type": "module",
+  "bin": {
+    "nodalcore": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@nodalcore/plugin-host": "workspace:*",
+    "@nodalcore/registry-client": "workspace:*",
+    "@nodalcore/sdk": "workspace:*",
+    "commander": "^13.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.7.0"
+  }
+}

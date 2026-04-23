@@ -1,0 +1,8 @@
+export { App } from './App.js'
+export { PluginCard } from './components/PluginCard.js'
+export { SettingsPanel } from './components/SettingsPanel.js'
+export { StorePage } from './pages/StorePage.js'
+export { InstalledPage } from './pages/InstalledPage.js'
+export { usePluginBridge } from './hooks/usePluginBridge.js'
+export type { PluginCardProps } from './components/PluginCard.js'
+export type { SettingsPanelProps } from './components/SettingsPanel.js'
