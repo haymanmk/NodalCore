@@ -6,7 +6,7 @@ export interface RegistryPluginEntry {
   name: string
   version: string
   description: string
-  icon: string
+  icon?: string
   type: PluginType
   connectionType?: ConnectionType
   permissions: Permission[]

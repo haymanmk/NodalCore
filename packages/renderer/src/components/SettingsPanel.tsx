@@ -1,6 +1,7 @@
-import React, { useCallback } from 'react'
+import { useCallback } from 'react'
 import Form from '@rjsf/core'
-import type { ValidatorType } from '@rjsf/utils'
+import type { ValidatorType, SubmitButtonProps } from '@rjsf/utils'
+import { getSubmitButtonOptions } from '@rjsf/utils'
 import validator from '@rjsf/validator-ajv8'
 import type { IChangeEvent } from '@rjsf/core'
 import type { JSONSchema7 } from 'json-schema'
@@ -16,6 +17,18 @@ export interface SettingsPanelProps {
   /** Called on every field change (useful for live preview) */
   onChange?: (pluginId: string, settings: SettingsRecord) => void
   readOnly?: boolean
+}
+
+function AppSubmitButton({ uiSchema }: SubmitButtonProps) {
+  const { norender, submitText, props: btnProps } = getSubmitButtonOptions(uiSchema)
+  if (norender) return null
+  return (
+    <div className="settings-panel__footer">
+      <button type="submit" className="settings-panel__submit" {...btnProps}>
+        {submitText}
+      </button>
+    </div>
+  )
 }
 
 export function SettingsPanel({
@@ -53,6 +66,7 @@ export function SettingsPanel({
         onSubmit={handleSubmit}
         onChange={handleChange}
         disabled={readOnly}
+        templates={{ ButtonTemplates: { SubmitButton: AppSubmitButton } }}
         uiSchema={{
           'ui:submitButtonOptions': {
             submitText: 'Apply',

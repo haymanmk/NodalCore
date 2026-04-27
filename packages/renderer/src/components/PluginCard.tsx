@@ -44,15 +44,15 @@ export function PluginCard({
         {showFallback ? (
           <IconFallback name={plugin.name} />
         ) : (
-          <div className="plugin-card__icon">
-            <img
-              src={plugin.icon}
-              alt=""
-              width={48}
-              height={48}
-              onError={() => setIconError(true)}
-            />
-          </div>
+          <img
+            className="plugin-card__icon"
+            src={plugin.icon!}
+            alt=""
+            width={48}
+            height={48}
+            loading="eager"
+            onError={() => setIconError(true)}
+          />
         )}
       </div>
 

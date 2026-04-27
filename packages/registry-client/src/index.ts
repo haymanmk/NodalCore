@@ -10,7 +10,7 @@ export type { RegistryIndex, RegistryPluginEntry }
  */
 const DEFAULT_REGISTRY_URL =
   (typeof process !== 'undefined' && process.env?.NODALCORE_REGISTRY_URL) ||
-  'https://nodalcore.github.io/registry/index.json'
+  'https://haymanmk.github.io/NodalCore-Store/registry/index.json'
 
 let cachedIndex: RegistryIndex | null = null
 let cachedAt = 0

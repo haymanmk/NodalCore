@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { PluginManifest, SettingsRecord } from '@nodalcore/sdk'
 
 /**
@@ -43,7 +43,7 @@ function getBridge(): NodalCoreBridge {
 }
 
 export function usePluginBridge() {
-  const bridge = getBridge()
+  const bridge = useMemo(() => getBridge(), [])
   const [installedPlugins, setInstalledPlugins] = useState<InstalledPluginEntry[]>([])
 
   const refresh = useCallback(async () => {
