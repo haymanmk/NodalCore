@@ -13,6 +13,15 @@ interface SpawnedTool {
 
 const running = new Map<string, SpawnedTool>()
 
+const JS_EXTENSIONS = new Set(['.js', '.mjs', '.cjs'])
+
+function resolveLaunchCommand(execPath: string): [string, string[]] {
+  if (JS_EXTENSIONS.has(path.extname(execPath).toLowerCase())) {
+    return [process.execPath, [execPath]]
+  }
+  return [execPath, []]
+}
+
 /**
  * Spawn a standalone-tool plugin executable.
  * The executable must print a single line to stdout in the format:
@@ -31,11 +40,14 @@ export async function spawnTool(pluginId: string): Promise<SpawnedTool> {
   }
 
   const execPath = path.resolve(pluginDir, manifest.executable)
+  const [command, args] = resolveLaunchCommand(execPath)
 
-  const child = spawn(execPath, [], {
+  const child = spawn(command, args, {
+    cwd: pluginDir,
     env: {
       ...process.env,
       NODALCORE_PLUGIN_ID: pluginId,
+      NODALCORE_PLUGIN_DIR: pluginDir,
     },
     stdio: ['pipe', 'pipe', 'pipe'],
   })

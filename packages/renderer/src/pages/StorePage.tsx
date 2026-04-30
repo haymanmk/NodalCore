@@ -1,12 +1,12 @@
-import React, { useEffect, useState, useCallback } from 'react'
-import { fetchIndex, searchPlugins } from '@nodalcore/registry-client'
+import React, { useEffect, useState, useMemo, useCallback } from 'react'
+import { fetchIndex } from '@nodalcore/registry-client'
 import type { RegistryPluginEntry } from '@nodalcore/registry-client'
 import { PluginCard } from '../components/PluginCard.js'
 import { usePluginBridge } from '../hooks/usePluginBridge.js'
 import { MOCK_REGISTRY } from '../mockRegistry.js'
 
 export function StorePage() {
-  const [plugins, setPlugins] = useState<RegistryPluginEntry[]>([])
+  const [allPlugins, setAllPlugins] = useState<RegistryPluginEntry[]>([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [installing, setInstalling] = useState<Set<string>>(new Set())
@@ -16,36 +16,24 @@ export function StorePage() {
   useEffect(() => {
     fetchIndex()
       .then((index) => {
-        const list = index.plugins.length > 0 ? index.plugins : MOCK_REGISTRY.plugins
-        setPlugins(list)
+        setAllPlugins(index.plugins.length > 0 ? index.plugins : MOCK_REGISTRY.plugins)
       })
       .catch(() => {
-        setPlugins(MOCK_REGISTRY.plugins)
+        setAllPlugins(MOCK_REGISTRY.plugins)
       })
       .finally(() => setLoading(false))
   }, [])
 
-  const handleSearch = useCallback(
-    async (q: string) => {
-      setQuery(q)
-      if (!q) {
-        setPlugins(MOCK_REGISTRY.plugins)
-        return
-      }
-      const lq = q.toLowerCase()
-      const results = MOCK_REGISTRY.plugins.filter(
-        (p) =>
-          p.name.toLowerCase().includes(lq) ||
-          p.description.toLowerCase().includes(lq) ||
-          p.tags.some((t) => t.toLowerCase().includes(lq)),
-      )
-      setPlugins(results)
-
-      // Also try the live registry if available
-      searchPlugins({ query: q }).then(setPlugins).catch(() => {})
-    },
-    [],
-  )
+  const plugins = useMemo(() => {
+    if (!query) return allPlugins
+    const lq = query.toLowerCase()
+    return allPlugins.filter(
+      (p) =>
+        p.name.toLowerCase().includes(lq) ||
+        p.description.toLowerCase().includes(lq) ||
+        p.tags.some((t) => t.toLowerCase().includes(lq)),
+    )
+  }, [allPlugins, query])
 
   const handleInstall = useCallback(
     async (id: string) => {
@@ -90,7 +78,7 @@ export function StorePage() {
           type="search"
           placeholder="Search plugins…"
           value={query}
-          onChange={(e) => handleSearch(e.target.value)}
+          onChange={(e) => setQuery(e.target.value)}
           aria-label="Search plugins"
         />
       </div>

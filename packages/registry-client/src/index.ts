@@ -1,6 +1,6 @@
-import type { RegistryIndex, RegistryPluginEntry } from './types.js'
+import type { RegistryIndex, RegistryPluginEntry, RegistryArtifact } from './types.js'
 
-export type { RegistryIndex, RegistryPluginEntry }
+export type { RegistryIndex, RegistryPluginEntry, RegistryArtifact }
 
 /**
  * Default registry index URL.

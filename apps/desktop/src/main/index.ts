@@ -8,6 +8,7 @@ import {
   unloadDevicePlugin,
   spawnTool,
   stopTool,
+  reconcileRegistry,
 } from '@nodalcore/plugin-host'
 import type { ConnectionOptions } from '@nodalcore/sdk'
 
@@ -36,6 +37,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  reconcileRegistry().catch(console.error)
   registerIpcHandlers()
   createWindow()
 

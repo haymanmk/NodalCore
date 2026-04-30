@@ -6,6 +6,16 @@ import { promisify } from 'node:util'
 import _Ajv from 'ajv'
 import _addFormats from 'ajv-formats'
 import type { PluginManifest } from '@nodalcore/sdk'
+import type { RegistryArtifact, RegistryPluginEntry } from '@nodalcore/registry-client'
+import { getPlugin } from '@nodalcore/registry-client'
+import {
+  describeCurrentPlatform,
+  downloadArtifact,
+  selectArtifact,
+  unpackArtifact,
+  UnsupportedPlatformError,
+  verifyIntegrity,
+} from './artifact.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -41,44 +51,184 @@ addFormats(ajv)
 const validateManifest = ajv.compile(MANIFEST_SCHEMA)
 
 export interface InstallOptions {
-  /** Git URL or local file path to a plugin zip/directory */
+  /** Git URL, local directory path, or registry plugin id */
   source: string
+  /** Override the registry index URL used for id lookups */
+  registryUrl?: string
   onProgress?: (message: string) => void
 }
 
+function isGitUrl(source: string): boolean {
+  return (
+    source.startsWith('http://') ||
+    source.startsWith('https://') ||
+    source.startsWith('git@')
+  )
+}
+
+async function isExistingDirectory(absPath: string): Promise<boolean> {
+  try {
+    const stat = await fs.stat(absPath)
+    return stat.isDirectory()
+  } catch {
+    return false
+  }
+}
+
+type ResolvedSource =
+  | { kind: 'git'; url: string }
+  | { kind: 'local'; dir: string }
+  | { kind: 'artifact'; entry: RegistryPluginEntry; artifact: RegistryArtifact }
+
+async function resolveSource(
+  source: string,
+  registryUrl: string | undefined,
+  log: (msg: string) => void,
+): Promise<ResolvedSource> {
+  if (isGitUrl(source)) return { kind: 'git', url: source }
+
+  const absPath = path.resolve(source)
+  if (await isExistingDirectory(absPath)) return { kind: 'local', dir: absPath }
+
+  log(`Looking up "${source}" in registry…`)
+  const entry = await getPlugin(source, registryUrl ? { registryUrl } : {})
+  if (!entry) {
+    throw new Error(
+      `"${source}" is not a git URL, an existing local directory, or a known plugin id`,
+    )
+  }
+
+  if (entry.artifacts && entry.artifacts.length > 0) {
+    const artifact = selectArtifact(entry.artifacts)
+    if (!artifact) {
+      const platform = describeCurrentPlatform()
+      throw new UnsupportedPlatformError(
+        `Plugin "${source}" has no artifact for ${platform.os}/${platform.cpu}` +
+          (platform.libc ? `/${platform.libc}` : ''),
+      )
+    }
+    return { kind: 'artifact', entry, artifact }
+  }
+
+  if (!entry.repository) {
+    throw new Error(
+      `Plugin "${source}" has no install artifacts and no repository URL`,
+    )
+  }
+  return { kind: 'git', url: entry.repository }
+}
+
 export async function installPlugin(options: InstallOptions): Promise<PluginManifest> {
-  const { source, onProgress } = options
+  const { source, registryUrl, onProgress } = options
   const log = (msg: string) => onProgress?.(msg)
 
   await fs.mkdir(PLUGINS_DIR, { recursive: true })
 
-  let pluginDir: string
+  const resolved = await resolveSource(source, registryUrl, log)
 
-  if (source.startsWith('http://') || source.startsWith('https://') || source.startsWith('git@')) {
-    // Derive a temporary id from the git URL to name the clone directory
-    const repoName = source.split('/').pop()?.replace(/\.git$/, '') ?? 'unknown'
-    pluginDir = path.join(PLUGINS_DIR, `_tmp_${repoName}_${Date.now()}`)
-    log(`Cloning ${source}…`)
-    await execFileAsync('git', ['clone', '--depth', '1', source, pluginDir])
-    log('Clone complete.')
-  } else {
-    // Local directory — use directly
-    pluginDir = path.resolve(source)
+  if (resolved.kind === 'artifact') {
+    return installFromArtifact(resolved.entry, resolved.artifact, log)
   }
 
-  const manifest = await readAndValidateManifest(pluginDir)
+  // Legacy paths: git clone or local source directory.
+  let stagingDir: string
+  if (resolved.kind === 'git') {
+    const repoName = resolved.url.split('/').pop()?.replace(/\.git$/, '') ?? 'unknown'
+    stagingDir = path.join(PLUGINS_DIR, `_tmp_${repoName}_${Date.now()}`)
+    log(`Cloning ${resolved.url}…`)
+    await execFileAsync('git', ['clone', '--depth', '1', resolved.url, stagingDir])
+    log('Clone complete.')
+  } else {
+    stagingDir = resolved.dir
+  }
+
+  const manifest = await readAndValidateManifest(stagingDir)
   log(`Manifest validated: ${manifest.id}@${manifest.version}`)
 
-  // If cloned to a temp dir, rename to the official plugin id directory
   const finalDir = path.join(PLUGINS_DIR, manifest.id)
-  if (pluginDir !== finalDir) {
-    await fs.rm(finalDir, { recursive: true, force: true })
-    await fs.rename(pluginDir, finalDir)
+  if (stagingDir !== finalDir) {
+    await atomicReplaceDir(stagingDir, finalDir)
   }
 
   await upsertRegistry(manifest)
   log(`Installed ${manifest.id}@${manifest.version}`)
   return manifest
+}
+
+async function installFromArtifact(
+  entry: RegistryPluginEntry,
+  artifact: RegistryArtifact,
+  log: (msg: string) => void,
+): Promise<PluginManifest> {
+  const downloadPath = path.join(
+    PLUGINS_DIR,
+    `_dl_${entry.id}_${Date.now()}.tgz`,
+  )
+  const stagingDir = path.join(
+    PLUGINS_DIR,
+    `_tmp_${entry.id}_${Date.now()}`,
+  )
+
+  try {
+    log(`Downloading artifact ${artifact.url}…`)
+    await downloadArtifact(artifact.url, downloadPath)
+
+    log('Verifying integrity…')
+    await verifyIntegrity(downloadPath, artifact.integrity)
+
+    log('Unpacking…')
+    await unpackArtifact(downloadPath, stagingDir)
+
+    const manifest = await readAndValidateManifest(stagingDir)
+    if (manifest.id !== entry.id) {
+      throw new Error(
+        `Manifest id "${manifest.id}" does not match registry id "${entry.id}"`,
+      )
+    }
+    log(`Manifest validated: ${manifest.id}@${manifest.version}`)
+
+    const finalDir = path.join(PLUGINS_DIR, manifest.id)
+    await atomicReplaceDir(stagingDir, finalDir)
+
+    await upsertRegistry(manifest)
+    log(`Installed ${manifest.id}@${manifest.version}`)
+    return manifest
+  } catch (err) {
+    await fs.rm(stagingDir, { recursive: true, force: true })
+    throw err
+  } finally {
+    await fs.rm(downloadPath, { force: true }).catch(() => {})
+  }
+}
+
+/**
+ * Replace `finalDir` with the contents of `stagingDir` while keeping the
+ * previous installation intact if anything fails. The previous version is
+ * moved to `<finalDir>.old` first; if the second rename fails, it is rolled
+ * back. Both paths must live on the same filesystem (callers stage under
+ * `PLUGINS_DIR` to ensure this).
+ */
+async function atomicReplaceDir(stagingDir: string, finalDir: string): Promise<void> {
+  const backupDir = `${finalDir}.old`
+  await fs.rm(backupDir, { recursive: true, force: true })
+
+  const hadPrevious = await isExistingDirectory(finalDir)
+  if (hadPrevious) {
+    await fs.rename(finalDir, backupDir)
+  }
+
+  try {
+    await fs.rename(stagingDir, finalDir)
+  } catch (err) {
+    if (hadPrevious) {
+      await fs.rename(backupDir, finalDir).catch(() => {})
+    }
+    throw err
+  }
+
+  if (hadPrevious) {
+    await fs.rm(backupDir, { recursive: true, force: true }).catch(() => {})
+  }
 }
 
 export async function uninstallPlugin(pluginId: string): Promise<void> {
@@ -156,6 +306,24 @@ async function removeFromRegistry(pluginId: string): Promise<void> {
 export async function listInstalledPlugins(): Promise<RegistryEntry[]> {
   const registry = await readRegistry()
   return Object.values(registry)
+}
+
+export async function reconcileRegistry(): Promise<void> {
+  const registry = await readRegistry()
+  let changed = false
+
+  for (const pluginId of Object.keys(registry)) {
+    const pluginDir = path.join(PLUGINS_DIR, pluginId)
+    const exists = await isExistingDirectory(pluginDir)
+    if (!exists) {
+      delete registry[pluginId]
+      changed = true
+    }
+  }
+
+  if (changed) {
+    await writeRegistry(registry)
+  }
 }
 
 export async function getInstalledPlugin(pluginId: string): Promise<RegistryEntry | undefined> {

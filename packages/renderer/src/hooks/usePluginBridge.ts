@@ -21,6 +21,8 @@ interface NodalCoreBridge {
   uninstall: (id: string) => Promise<void>
   connect: (id: string) => Promise<void>
   disconnect: (id: string) => Promise<void>
+  startTool: (id: string) => Promise<void>
+  stopTool: (id: string) => Promise<void>
   readSettings: (id: string) => Promise<SettingsRecord>
   writeSettings: (id: string, settings: Partial<SettingsRecord>) => Promise<void>
 }
@@ -37,6 +39,8 @@ function getBridge(): NodalCoreBridge {
     uninstall: async () => { throw new Error('Uninstall not available in web mode') },
     connect: async () => { throw new Error('Connect not available in web mode') },
     disconnect: async () => {},
+    startTool: async () => { throw new Error('Start tool not available in web mode') },
+    stopTool: async () => { throw new Error('Stop tool not available in web mode') },
     readSettings: async () => ({}),
     writeSettings: async () => { throw new Error('Write not available in web mode') },
   }
@@ -73,6 +77,16 @@ export function usePluginBridge() {
     await refresh()
   }, [bridge, refresh])
 
+  const startTool = useCallback(async (id: string) => {
+    await bridge.startTool(id)
+    await refresh()
+  }, [bridge, refresh])
+
+  const stopTool = useCallback(async (id: string) => {
+    await bridge.stopTool(id)
+    await refresh()
+  }, [bridge, refresh])
+
   const readSettings = useCallback(
     (id: string) => bridge.readSettings(id),
     [bridge],
@@ -92,6 +106,8 @@ export function usePluginBridge() {
     uninstall,
     connect,
     disconnect,
+    startTool,
+    stopTool,
     readSettings,
     writeSettings,
     refresh,

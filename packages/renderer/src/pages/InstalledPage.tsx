@@ -31,7 +31,7 @@ function PluginIcon({ manifest }: { manifest: PluginManifest }) {
 }
 
 export function InstalledPage() {
-  const { installedPlugins, connect, disconnect, writeSettings } = usePluginBridge()
+  const { installedPlugins, connect, disconnect, startTool, stopTool, writeSettings } = usePluginBridge()
 
   if (installedPlugins.length === 0) {
     return (
@@ -69,20 +69,38 @@ export function InstalledPage() {
               </span>
 
               <div className="installed-page__item-actions">
-                {entry.status === 'idle' || entry.status === 'error' ? (
-                  <button
-                    className="installed-page__btn installed-page__btn--connect"
-                    onClick={() => connect(entry.manifest.id)}
-                  >
-                    Connect
-                  </button>
+                {entry.manifest.type === 'device-bridge' ? (
+                  entry.status === 'idle' || entry.status === 'error' ? (
+                    <button
+                      className="installed-page__btn installed-page__btn--connect"
+                      onClick={() => connect(entry.manifest.id)}
+                    >
+                      Connect
+                    </button>
+                  ) : (
+                    <button
+                      className="installed-page__btn installed-page__btn--disconnect"
+                      onClick={() => disconnect(entry.manifest.id)}
+                    >
+                      Disconnect
+                    </button>
+                  )
                 ) : (
-                  <button
-                    className="installed-page__btn installed-page__btn--disconnect"
-                    onClick={() => disconnect(entry.manifest.id)}
-                  >
-                    Disconnect
-                  </button>
+                  entry.status === 'idle' || entry.status === 'error' ? (
+                    <button
+                      className="installed-page__btn installed-page__btn--connect"
+                      onClick={() => startTool(entry.manifest.id)}
+                    >
+                      Start
+                    </button>
+                  ) : (
+                    <button
+                      className="installed-page__btn installed-page__btn--disconnect"
+                      onClick={() => stopTool(entry.manifest.id)}
+                    >
+                      Stop
+                    </button>
+                  )
                 )}
               </div>
             </div>
