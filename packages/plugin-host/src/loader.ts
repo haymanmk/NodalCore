@@ -1,4 +1,6 @@
 import path from 'node:path'
+import { existsSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { fork, type ChildProcess } from 'node:child_process'
 import { PLUGINS_DIR, readAndValidateManifest } from './installer.js'
 import type { DevicePlugin, ConnectionOptions } from '@nodalcore/sdk'
@@ -42,7 +44,7 @@ export async function loadDevicePlugin(pluginId: string): Promise<DevicePlugin> 
   }
 
   const entryPath = path.resolve(pluginDir, manifest.main)
-  const workerPath = new URL('./worker.js', import.meta.url).pathname
+  const workerPath = locateWorker()
 
   const child = fork(workerPath, [entryPath, pluginId], {
     stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
@@ -113,6 +115,43 @@ export async function unloadDevicePlugin(pluginId: string): Promise<void> {
   await call(entry, 'disconnect', null).catch(() => {})
   entry.process.kill()
   loaded.delete(pluginId)
+}
+
+/**
+ * Resolve the path to `worker.js` at runtime. We can't use
+ * `new URL('./worker.js', import.meta.url)` because callers consume this
+ * module from many layouts: tsup bundle (`dist/index.js` + sibling
+ * `dist/worker.js`), electron-vite main bundle (single `out/main/index.js`
+ * with worker.js coming from the plugin-host's published dist via the
+ * workspace symlink), and source mode (typecheck / vitest, where
+ * `src/worker.ts` is the file).
+ */
+function locateWorker(): string {
+  const here = fileURLToPath(import.meta.url)
+  const candidates = [
+    // tsup dist mode: dist/index.js → dist/worker.js
+    path.join(path.dirname(here), 'worker.js'),
+    // src mode: src/loader.ts → src/worker.ts (vitest, ts-node)
+    path.join(path.dirname(here), 'worker.ts'),
+    // electron-vite bundle case: out/main/index.js → resolve from package
+    // dir via the workspace symlink at <consumer>/node_modules/@nodalcore/plugin-host
+    path.resolve(path.dirname(here), '../../packages/plugin-host/dist/worker.js'),
+    path.resolve(path.dirname(here), '../node_modules/@nodalcore/plugin-host/dist/worker.js'),
+  ]
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate
+  }
+  // Last-resort: ask Node's resolver via createRequire. Works whenever the
+  // host's node_modules tree includes @nodalcore/plugin-host.
+  try {
+    const requireFn = (
+      globalThis as { require?: (id: string) => unknown }
+    ).require as ((id: string) => string) | undefined
+    if (requireFn) return requireFn('@nodalcore/plugin-host/dist/worker.js')
+  } catch {
+    // ignore
+  }
+  throw new Error('plugin-host: worker.js not found in any candidate location')
 }
 
 /**

@@ -5,8 +5,8 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --outDir dist",
-    "dev": "tsup src/index.ts --format esm --dts --outDir dist --watch"
+    "build": "tsup",
+    "dev": "tsup --watch"
   },
   "dependencies": {
     "@nodalcore/sdk": "workspace:*"
