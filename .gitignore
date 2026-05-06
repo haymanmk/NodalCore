@@ -5,6 +5,7 @@ out/
 *.tsbuildinfo
 .env
 .DS_Store
+.github/prompts/
 
 # Built bundle for the standalone-tool example (run `pnpm --filter example-image-processor build` to regenerate)
 examples/plugin-standalone-tool/bin/
