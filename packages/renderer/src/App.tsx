@@ -61,7 +61,7 @@ export function App() {
             <ThemePicker />
           </nav>
 
-          <main className="app__main">
+          <main className={`app__main ${tab === 'workspace' ? 'app__main--flush' : ''}`}>
             {tab === 'store' && <StorePage />}
             {tab === 'installed' && <InstalledPage />}
             {tab === 'workspace' && <WorkspacePage />}

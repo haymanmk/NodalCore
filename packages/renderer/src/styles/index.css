@@ -168,6 +168,14 @@ html, body, #root {
   flex: 1;
   overflow-y: auto;
   padding: 24px;
+  min-height: 0;
+}
+
+.app__main--flush {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ──────────────────────────────────────────────────────────
@@ -789,21 +797,50 @@ img.plugin-card__icon {
 
 .host-toast__item {
   pointer-events: auto;
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 240px;
   max-width: 360px;
-  padding: 10px 14px;
+  padding: 10px 32px 10px 14px;
   background: var(--surface-raised);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-left: 2px solid var(--accent);
   border-radius: var(--radius-sm, 6px);
   color: var(--text-primary);
   font-size: 13px;
-  cursor: pointer;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
   animation: host-toast-in 160ms ease-out;
+}
+
+.host-toast__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition), background var(--transition);
+}
+
+.host-toast__close:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.host-toast__close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .host-toast__item--warning { border-left-color: #f59e0b; }

@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
+import type { IpcMainInvokeEvent } from 'electron'
 import path from 'node:path'
 import {
   installPlugin,
@@ -96,61 +97,99 @@ app.on('window-all-closed', () => {
 // IPC handlers — these are the safe API surface exposed to the renderer
 // ---------------------------------------------------------------------------
 
+// Sentinel pluginId for host-originated toasts so the renderer's
+// HostMessageToast can render IPC-handler failures the same way it renders
+// plugin window.showMessage events.
+const SYSTEM_TOAST_SOURCE = 'NodalCore'
+
+function emitSystemToast(level: 'info' | 'warning' | 'error', message: string) {
+  mainWindow?.webContents.send('host:window:showMessage', {
+    pluginId: SYSTEM_TOAST_SOURCE,
+    level,
+    message,
+  })
+}
+
+// Wrap an IPC handler so any thrown error is surfaced to the user as an error
+// toast in addition to rejecting the renderer-side promise. Without this,
+// fatal main-side errors (failed git clone, manifest validation, sdk-version
+// mismatch, …) only appear in the dev console.
+function safeHandle<Args extends unknown[]>(
+  channel: string,
+  label: string,
+  handler: (event: IpcMainInvokeEvent, ...args: Args) => Promise<unknown>,
+) {
+  ipcMain.handle(channel, async (event, ...args) => {
+    try {
+      return await handler(event, ...(args as Args))
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      emitSystemToast('error', `${label} failed: ${message}`)
+      throw err
+    }
+  })
+}
+
 function registerIpcHandlers() {
   // Plugin management
-  ipcMain.handle('plugin:list', async () => {
+  safeHandle('plugin:list', 'List plugins', async () => {
     return listInstalledPlugins()
   })
 
-  ipcMain.handle('plugin:install', async (_event, idOrUrl: string) => {
+  safeHandle('plugin:install', 'Install plugin', async (_event, idOrUrl: string) => {
     return installPlugin({ source: idOrUrl })
   })
 
-  ipcMain.handle('plugin:uninstall', async (_event, pluginId: string) => {
+  safeHandle('plugin:uninstall', 'Uninstall plugin', async (_event, pluginId: string) => {
     return uninstallPlugin(pluginId)
   })
 
   // Device-bridge plugins
-  ipcMain.handle('device:connect', async (_event, pluginId: string, _options: ConnectionOptions) => {
+  safeHandle('device:connect', 'Connect device', async (_event, pluginId: string, _options: ConnectionOptions) => {
     await loadDevicePlugin(pluginId)
     return { success: true }
   })
 
-  ipcMain.handle('device:disconnect', async (_event, pluginId: string) => {
+  safeHandle('device:disconnect', 'Disconnect device', async (_event, pluginId: string) => {
     await unloadDevicePlugin(pluginId)
     return { success: true }
   })
 
   // Settings — backed by host-side configuration store (~/.nodalcore/configurations.json).
   // Settings are no longer plugin-resident; plugins read them via host.workspace.getConfiguration.
-  ipcMain.handle('settings:read', async (_event, pluginId: string) => {
+  safeHandle('settings:read', 'Read settings', async (_event, pluginId: string) => {
     return getConfiguration(pluginId)
   })
 
-  ipcMain.handle('settings:write', async (_event, pluginId: string, settings: Record<string, unknown>) => {
-    await setConfiguration(pluginId, settings)
-    return { success: true }
-  })
+  safeHandle(
+    'settings:write',
+    'Write settings',
+    async (_event, pluginId: string, settings: Record<string, unknown>) => {
+      await setConfiguration(pluginId, settings)
+      return { success: true }
+    },
+  )
 
   // Standalone tools
-  ipcMain.handle('tool:start', async (_event, pluginId: string) => {
+  safeHandle('tool:start', 'Start tool', async (_event, pluginId: string) => {
     const tool = await spawnTool(pluginId)
     return { port: tool.port }
   })
 
-  ipcMain.handle('tool:stop', async (_event, pluginId: string) => {
+  safeHandle('tool:stop', 'Stop tool', async (_event, pluginId: string) => {
     await stopTool(pluginId)
     return { success: true }
   })
 
   // Aggregated declarative contributions (themes + sidebar/statusBar slots + panels).
-  ipcMain.handle('contributions:list', async () => {
+  safeHandle('contributions:list', 'List contributions', async () => {
     return listContributions()
   })
 
   // Workspace tab — webview lifecycle.
-  ipcMain.handle(
+  safeHandle(
     'workspace:show-panel',
+    'Show panel',
     async (_event, pluginId: string, slotId: string, htmlPath: string) => {
       const preloadPath = path.join(__dirname, '../preload/webview.js')
       showPanel({ pluginId, slotId, htmlPath, preloadPath })
@@ -158,13 +197,14 @@ function registerIpcHandlers() {
     },
   )
 
-  ipcMain.handle('workspace:hide-panel', async () => {
+  safeHandle('workspace:hide-panel', 'Hide panel', async () => {
     hideActive()
     return { success: true }
   })
 
-  ipcMain.handle(
+  safeHandle(
     'workspace:destroy-panel',
+    'Destroy panel',
     async (_event, pluginId: string, slotId: string) => {
       destroyPanel(pluginId, slotId)
       return { success: true }
@@ -174,8 +214,9 @@ function registerIpcHandlers() {
   // Renderer reports the panel rectangle (in CSS pixels relative to the
   // BrowserWindow content area). Main updates the active WebContentsView's
   // bounds — main owns layout for the panel region per the no-overlap rule.
-  ipcMain.handle(
+  safeHandle(
     'workspace:set-bounds',
+    'Set workspace bounds',
     async (_event, bounds: { x: number; y: number; width: number; height: number }) => {
       setPanelBounds({
         x: Math.round(bounds.x),

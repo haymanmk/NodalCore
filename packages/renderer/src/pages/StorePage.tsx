@@ -40,6 +40,9 @@ export function StorePage() {
       setInstalling((prev) => new Set(prev).add(id))
       try {
         await install(id)
+      } catch {
+        // Surfaced visually via host:window:showMessage in main; no need to
+        // re-throw here and trigger an unhandled-rejection warning.
       } finally {
         setInstalling((prev) => {
           const next = new Set(prev)
