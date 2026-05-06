@@ -39,13 +39,6 @@
         panel; tool ← panel routing isn't wired in v1.
       </p>
     </main>
-    <script>
-      document.getElementById('origin').textContent = location.origin
-      document.getElementById('ts').textContent     = new Date().toLocaleTimeString()
-      window.nodalcore?.onMessage((data) => {
-        // No-op for now — example just demonstrates the receive-only path.
-        console.log('[panel] received', data)
-      })
-    </script>
+    <script src="panel.js"></script>
   </body>
 </html>

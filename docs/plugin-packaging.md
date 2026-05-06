@@ -23,19 +23,68 @@ plugin is registered.
 
 ## Artifact Shape
 
-A Node.js service artifact should be a `.tgz` archive with a plugin root that
+A Node.js plugin artifact should be a `.tgz` archive with a plugin root that
 contains:
 
 - `nodal.json`
-- compiled service code referenced by `entry` or `executable`
-- runtime assets required by the service
+- compiled service code referenced by `main` (device-bridge) or `executable` (standalone-tool)
+- runtime assets the manifest's `contributes` block points at — theme JSON
+  files, panel webview HTML / JS / CSS / images
 - platform-specific native binaries when needed
 - any package files required by the bundled runtime
 
-Most plugins should bundle their JavaScript dependencies into compiled runtime
-output and avoid shipping a full `node_modules` tree. Shipping selected runtime
-package files or `node_modules` is allowed when a dependency cannot be bundled
-cleanly, but the artifact must still be complete at install time.
+Plugins MUST bundle their JavaScript dependencies into the compiled runtime
+output. The installer does NOT run `npm install` on the plugin directory and
+does NOT hoist any host-side `node_modules` into reach of the plugin. A
+plugin installed at `~/.nodalcore/plugins/<id>/` is run against an empty
+node_modules tree — anything not inlined into the bundle will throw
+`ERR_MODULE_NOT_FOUND` at activation time.
+
+### Recommended tsup config
+
+Both reference plugins use this pattern (see
+[`examples.md`](./examples.md)):
+
+```ts
+// tsup.config.ts
+import { defineConfig } from 'tsup'
+
+export default defineConfig({
+  entry: { index: 'src/index.ts' },           // or { tool: 'src/tool.js' }
+  outDir: 'dist',                             // or 'bin' for standalone-tool
+  format: ['esm'],
+  target: 'node20',
+  platform: 'node',
+  noExternal: [/.*/],                         // inline ALL deps
+  banner: {
+    js: [
+      'import { createRequire as __nodalcoreCreateRequire } from "node:module";',
+      'const require = __nodalcoreCreateRequire(import.meta.url);',
+    ].join('\n'),
+  },
+  dts: true,
+  clean: true,
+})
+```
+
+Two non-obvious bits:
+
+- **`noExternal: [/.*/]`** is critical. By default tsup externalizes
+  every entry in `dependencies`. Without this regex, your bundle will
+  have bare `import { … } from '@nodalcore/sdk'` lines that fail at
+  runtime.
+- **The `createRequire` banner** is needed because `@grpc/grpc-js` (a
+  transitive SDK dep, pulled in even when the plugin doesn't directly
+  use gRPC) calls dynamic `require()` internally. esbuild can't
+  statically resolve those when emitting ESM, so it emits a polyfill
+  that throws "Dynamic require of X is not supported." The banner
+  defines a real `require` from `import.meta.url` so the polyfill is
+  bypassed.
+
+Standalone-tool entries should additionally set
+`banner.js` to start with `#!/usr/bin/env node` if the bin file is
+executed directly (and remove any shebang from the source — tsup
+otherwise duplicates it).
 
 ## Registry Metadata
 
@@ -91,8 +140,13 @@ The final move should be atomic where the platform allows it. Failed downloads,
 integrity mismatches, unsupported platforms, malformed manifests, and unpack
 errors must leave the previous installed version intact.
 
-Local source-directory installs may keep the existing behavior so plugin authors
-can iterate without building an artifact for every edit.
+Local source-directory installs **copy** the source into a staging directory
+under `~/.nodalcore/plugins/_tmp_local_<ts>/` before the atomic swap. This
+is a deliberate change from earlier behavior, where the installer would
+rename the user's working tree into place — moving their checkout out
+from under them. Local installs still don't rebuild; you must run
+`pnpm build` (or whatever your bundler invocation is) on the source
+before installing.
 
 ## Runtime Flow
 
@@ -103,14 +157,20 @@ host Node.js runtime:
 process.execPath
 ```
 
-When spawning a service, the host should set the working directory to the plugin
-install directory and provide stable environment variables:
+When spawning a service, the host sets the working directory to the plugin
+install directory and provides these environment variables:
 
-- `NODALCORE_PLUGIN_ID`
-- `NODALCORE_PLUGIN_DIR`
+- `NODALCORE_PLUGIN_ID` — the plugin's manifest `id`
+- `NODALCORE_PLUGIN_DIR` — absolute path to `~/.nodalcore/plugins/<id>/`
+- `NODALCORE_HOST_PORT` — TCP port of the host's gRPC HostAPI service.
+  The tool dials `localhost:<port>` to access `host.window.*` /
+  `host.workspace.*` etc. See [`host-api.md`](./host-api.md).
 
-Additional host IPC or service endpoint variables can be added later without
-changing the artifact model.
+The host's gRPC server is started **before** the tool process is spawned,
+so the port is dialable as soon as the child boots. The tool must
+finish activation (host calls + starting its own service) before
+printing `NODALCORE_READY <port>` on stdout — the spawner waits for
+that line within a 10-second window.
 
 ## Native Modules
 
@@ -163,17 +223,27 @@ relevant modules are:
     the backup. If the second rename fails it rolls back from `<finalDir>.old`.
     Both paths live under `PLUGINS_DIR` so they share a filesystem and the
     renames are atomic on POSIX.
-- `packages/plugin-host/src/spawner.ts` — when launching a standalone tool the
-  spawner sets `cwd` to the plugin install directory and exports both
-  `NODALCORE_PLUGIN_ID` and `NODALCORE_PLUGIN_DIR`. JS entry points are still
-  launched with `process.execPath`.
+- `packages/plugin-host/src/spawner.ts` — orchestrates standalone-tool
+  startup: starts the host-side gRPC HostAPI server first
+  (`startHostApiGrpcServer`), spawns the executable with `cwd` set to
+  the plugin install directory and `NODALCORE_PLUGIN_ID`,
+  `NODALCORE_PLUGIN_DIR`, `NODALCORE_HOST_PORT` exported, then waits
+  for `NODALCORE_READY <port>` on stdout. The host gRPC server is
+  torn down on `stopTool` and on the child's exit event. JS entry
+  points are still launched with `process.execPath`.
+- `packages/plugin-host/src/host-api/grpc-server.ts` — implements the
+  HostAPI gRPC service. A single `Request(plugin_id, method, args_json)`
+  RPC dispatches into the same `dispatchHostRequest` broker the IPC
+  loader uses. Host handlers are registered once via
+  `registerHostApiHandlers` regardless of which transport delivers the
+  call.
 
 ### Fallback behavior
 
 | Source                               | Path taken            |
 |--------------------------------------|-----------------------|
 | Git URL (`http(s)://`, `git@`)       | `git clone`           |
-| Existing local directory             | use directory in place |
+| Existing local directory             | copy into staging, then atomic swap |
 | Registry id, entry has matching artifact   | download + verify + unpack |
 | Registry id, entry has artifacts but none match platform | `UnsupportedPlatformError` |
 | Registry id, entry has no `artifacts[]`     | clone `repository` (legacy) |

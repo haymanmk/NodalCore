@@ -1,37 +1,50 @@
 # Plugin specification
 
-## nodal.json — the plugin manifest
+A NodalCore plugin is a directory with three things at its root:
 
-Every plugin must have a `nodal.json` file at its root. It is validated by
-`@nodalcore/plugin-host` at install time using AJV.
+1. `nodal.json` — the manifest (this document).
+2. An entry artifact pointed at by `main` (device-bridge) or `executable`
+   (standalone-tool).
+3. Any assets the manifest's `contributes` block references — theme JSON,
+   panel HTML, etc.
+
+The manifest is validated by `@nodalcore/plugin-host` at install time using
+AJV. Mismatched fields are rejected with explicit errors that point at the
+new field name when applicable.
+
+## Top-level shape
 
 ```jsonc
 {
-  // Required fields
+  // Required
   "id":          "com.example.my-sensor",   // reverse-domain, globally unique
   "name":        "My Sensor",
-  "version":     "1.0.0",                  // semver
-  "sdkVersion":  "^0.1.0",                 // semver range of @nodalcore/sdk
-  "type":        "device-bridge",          // or "standalone-tool"
-  "settingsSchema": { /* JSON Schema 7 */ },
-  "permissions": ["serial"],               // see Permissions below
+  "version":     "1.0.0",                   // semver
+  "sdkVersion":  "^0.2.0",                  // semver range of @nodalcore/sdk
+  "type":        "device-bridge",           // or "standalone-tool"
+  "permissions": ["serial"],                // see Permissions below
 
-  // device-bridge only
-  "connectionType": "serial",              // serial | usb | bluetooth | tcp | mqtt
-  "entry": "dist/index.js",               // path to JS entry, relative to plugin root
+  // Required for device-bridge
+  "main": "dist/index.js",                  // ESM module that exports activate(ctx)
 
-  // standalone-tool only
-  "executable": "./bin/tool.js",          // path to executable
-  "protoFile":  "proto/tool.proto",       // optional: path to .proto file
+  // Required for standalone-tool
+  "executable": "./bin/tool.js",            // path to the spawned binary
+  "protoFile":  "proto/tool.proto",         // optional — the tool's own service
+
+  // Type-specific (device-bridge only)
+  "connectionType": "serial",               // serial | usb | bluetooth | tcp | mqtt
+
+  // Declarative contributions consumed by the host
+  "contributes": { /* see "Contributes block" below */ },
 
   // Optional metadata
-  "icon":        "icon.png",              // URL or relative path (min 64×64)
+  "icon":        "icon.png",
   "description": "…",
   "author":      { "name": "…", "email": "…", "url": "…" },
   "repository":  "https://github.com/…",
   "homepage":    "https://…",
   "tags":        ["serial", "sensor"],
-  "integrity":   "sha256:<hex>"           // checksum of the plugin archive
+  "integrity":   "sha256:<hex>"             // checksum of the plugin archive
 }
 ```
 
@@ -39,103 +52,224 @@ Every plugin must have a `nodal.json` file at its root. It is validated by
 
 | Field | Rule |
 |---|---|
-| `id` | Lowercase, reverse-domain style. Must be unique in the registry. |
-| `sdkVersion` | Semver range. The host checks compatibility before loading. |
-| `settingsSchema` | Valid JSON Schema 7. `"default"` on each property pre-fills the UI. |
-| `permissions` | Must match `connectionType` (see below) or be extended for special cases. |
-| `entry` | Resolved relative to the plugin directory. Must export a class extending `DevicePlugin`. |
-| `executable` | Must print `NODALCORE_READY <port>` to stdout before the 10 s timeout. |
+| `id` | Lowercase, reverse-domain. Unique within the registry. Must match `^[a-zA-Z0-9._-]+$` (also enforced by the `nodal-plugin://` handler). |
+| `version` | Semver. |
+| `sdkVersion` | **Semver range.** The installer checks `semver.satisfies(SDK_VERSION, manifest.sdkVersion, { includePrerelease: true })` and rejects mismatches. |
+| `type` | Exactly `"device-bridge"` or `"standalone-tool"`. |
+| `main` | Required if `type === "device-bridge"`. Resolved relative to the plugin root. The module must export an `activate(ctx)` function (and optionally `deactivate()`). |
+| `executable` | Required if `type === "standalone-tool"`. Must print `NODALCORE_READY <port>` to stdout within 10 s of spawn. |
+| `permissions` | Must cover the `connectionType` (see below). Extra permissions are allowed. |
+| `connectionType` | Required for device-bridge. Drives the auto-granted permission. |
 
----
+### Removed / rejected fields
+
+These were valid in pre-0.2.0 manifests. The installer now rejects them with
+an error that points at the new field name:
+
+| Old field | Now |
+|---|---|
+| `entry` | rename to `main` |
+| `settingsSchema` | move to `contributes.configuration.properties` |
+
+## Permissions
+
+| `connectionType` | Auto-granted permission |
+|---|---|
+| `serial` | `serial` |
+| `usb` | `usb` |
+| `bluetooth` | `bluetooth` |
+| `tcp` | `network` |
+| `mqtt` | `network` |
+
+Permissions are surface for a future install-time consent dialog (mobile-app
+style); they are NOT enforced at runtime today. Extra permissions like
+`filesystem` or `network` can be declared on top of the auto-granted set.
 
 ## Plugin types
 
 ### device-bridge
 
-Wraps a physical device. The plugin entry module must export a default class
-that extends `DevicePlugin` from `@nodalcore/sdk`:
+Runs in a forked Node child process managed by the plugin host. The entry
+module is dynamically imported by a worker that owns the IPC envelope.
 
 ```ts
-import { DevicePlugin, ConnectionOptions, SettingsRecord } from '@nodalcore/sdk'
+// src/index.ts
+import type { ConnectionOptions, ExtensionContext } from '@nodalcore/sdk'
+import { DevicePlugin } from '@nodalcore/sdk'
 
 export default class MySensor extends DevicePlugin {
-  readonly connectionType = 'serial'
+  readonly connectionType = 'serial' as const
 
-  async connect(options: ConnectionOptions): Promise<void> { … }
-  async disconnect(): Promise<void> { … }
-
-  getSettingsSchema(): JSONSchema7 { return schema }
-  async readSettings(): Promise<SettingsRecord> { … }
-  async writeSettings(s: Partial<SettingsRecord>): Promise<void> { … }
+  async connect(options: ConnectionOptions): Promise<void> { /* … */ }
+  async disconnect(): Promise<void> { /* … */ }
 }
+
+export async function activate(ctx: ExtensionContext): Promise<void> {
+  const cfg = await ctx.workspace.getConfiguration()
+  await ctx.window.showMessage(`MySensor activated (mode: ${cfg.mode})`)
+  ctx.views.onMessage('readout', async (data) => {
+    // panel asks for a reading; return one
+    return { value: 42, unit: 'V', timestamp: Date.now() }
+  })
+}
+
+export async function deactivate(): Promise<void> { /* clean up */ }
 ```
 
-The plugin runs in a forked child process. Communication with the host is
-over Node IPC; the host exposes a transparent proxy object.
+`DevicePlugin` is now a thin abstract class with just `connectionType`,
+`connect`, and `disconnect`. Settings, host calls, and webview routing all
+flow through `ctx` — the plugin proxy is no longer the surface.
 
 ### standalone-tool
 
-An independent process (any language/runtime). The host `spawn()`s the
-executable and waits for it to print:
+An independent process (any language). The host spawns it with these env
+vars:
 
-```
-NODALCORE_READY <port>
-```
-
-After that the host connects to the tool's gRPC/Connect server on `<port>`.
-An optional `.proto` file can be declared in `nodal.json` for schema discovery.
-
----
-
-## Connection types & permissions
-
-| `connectionType` | Auto-granted `permissions` |
+| Variable | Purpose |
 |---|---|
-| `serial` | `["serial"]` |
-| `usb` | `["usb"]` |
-| `bluetooth` | `["bluetooth"]` |
-| `tcp` | `["network"]` |
-| `mqtt` | `["network"]` |
+| `NODALCORE_PLUGIN_ID` | The plugin's `id`. |
+| `NODALCORE_PLUGIN_DIR` | Absolute path to `~/.nodalcore/plugins/<id>/`. |
+| `NODALCORE_HOST_PORT` | TCP port of the host's gRPC HostAPI service (random localhost port). |
 
-Permissions are shown to the user at install time (similar to a mobile app).
-Extra permissions (e.g. `["serial", "filesystem"]`) can be declared explicitly.
+Activation sequence the tool must follow:
 
----
+1. Dial `localhost:NODALCORE_HOST_PORT` and build a gRPC HostAPI client.
+2. (Optional) call `host.window.showMessage` / `host.workspace.getConfiguration`
+   etc. as part of activation.
+3. Start the tool's own service.
+4. Print **exactly** `NODALCORE_READY <port>\n` on stdout — `<port>` is the
+   port the tool's service listens on.
 
-## Settings schema conventions
+Within 10 seconds. If the line doesn't appear or the child exits early, the
+spawner throws.
+
+For TypeScript / JS standalone tools the SDK provides
+`createGrpcTransport({ hostPort, pluginId })` to construct a `Transport`,
+plus `createExtensionContext(transport, pluginId)` to get a `ctx`. See
+[`host-api.md`](./host-api.md).
+
+For tools written in other languages, use `host_api.proto`
+(shipped at `packages/sdk/src/proto/host_api.proto`) to generate a HostAPI
+client. There's a single `Request(plugin_id, method, args_json)` rpc — every
+host call goes through it; method names match the IPC ones.
+
+## Contributes block
+
+Declarative contributions consumed by the host. Every field is optional;
+`type`-specific shape is documented inline.
 
 ```jsonc
 {
-  "type": "object",
-  "title": "Sensor Settings",          // displayed as the form title
-  "properties": {
-    "baudRate": {
-      "type": "number",
-      "title": "Baud rate",
-      "enum": [9600, 19200, 38400, 115200],
-      "default": 115200
+  "contributes": {
+    "configuration": {
+      "title": "Sensor Settings",          // section header in the form
+      "properties": {                      // JSON Schema 7 property map
+        "mode": {
+          "type": "string",
+          "title": "Operating mode",
+          "enum": ["voltmeter", "ammeter", "ohmmeter"],
+          "default": "voltmeter"
+        }
+      }
     },
-    "autoRange": {
-      "type": "boolean",
-      "title": "Auto-range",
-      "default": true
+    "themes": [
+      {
+        "id":    "sensor-blue",
+        "label": "Sensor — Blue",
+        "type":  "dark",                   // "dark" | "light"
+        "path":  "themes/sensor-blue.json" // CSS-var override map (relative)
+      }
+    ],
+    "views": {
+      "sidebar": [
+        // Declarative slot reserved in the sidebar; content rendering is
+        // not yet wired (5b lands panels first; sidebar in a future cut).
+        { "id": "history", "name": "History", "type": "list" }
+      ],
+      "statusBar": [
+        { "id": "current-reading", "alignment": "right", "priority": 10 }
+      ],
+      "panel": [
+        {
+          "id":   "readout",
+          "name": "Live Readout",
+          "html": "panel/index.html",      // served via nodal-plugin://
+          "csp":  {                        // optional CSP additions
+            "connect-src": ["https://api.example.com"]
+          }
+        }
+      ]
     }
-  },
-  "required": ["baudRate"]
+  }
 }
 ```
 
-- Use `"default"` on every property — it pre-fills the form when no live
-  `formData` is available.
-- Keep property keys camelCase; `"title"` is the human-readable label.
-- Complex nested schemas work; RJSF renders them recursively.
+### `configuration`
 
----
+Property map only — the host wraps it into a JSONSchema7 object internally.
+Use `"default"` on each property; `InstalledPage` reads them to pre-fill the
+form, and the same defaults flow through `ctx.workspace.getConfiguration()`
+when no value is stored.
+
+Settings live at `~/.nodalcore/configurations.json`, keyed by plugin id.
+Plugins read via `ctx.workspace.getConfiguration()` and write via
+`ctx.workspace.setConfiguration()`.
+
+### `themes`
+
+Each theme contribution points at a JSON file containing CSS custom-property
+overrides:
+
+```jsonc
+// themes/sensor-blue.json
+{
+  "--bg":             "#0a1626",
+  "--surface":        "#102236",
+  "--accent":         "#38bdf8",
+  "--text-primary":   "#e2f1ff"
+  /* … any of the variables in packages/renderer/src/styles/index.css … */
+}
+```
+
+The contributions aggregator loads the JSON at install/registry-walk time;
+the renderer's `ThemeProvider` applies the active theme's vars to
+`document.documentElement` and persists the choice in localStorage.
+
+### `views.sidebar`
+
+Declarative slots, no rendering yet. Reserved for a future cut.
+
+### `views.statusBar`
+
+The renderer's status bar shows a row of empty pills labeled
+`<pluginId>:<slotId>`. `alignment` (`left` / `right`) and `priority`
+(higher first within an alignment) drive ordering. Slot content rendering
+is pending future work — the chrome alone is enough to confirm the
+contribution surface exists.
+
+### `views.panel`
+
+Plugin-supplied HTML loaded in a native `WebContentsView` inside the
+Workspace tab. Each entry needs `id`, `name`, and `html` (path to the HTML
+entry, relative to the plugin root). The optional `csp` field merges
+additions into the default per-plugin-origin CSP — useful when a panel
+needs `connect-src` for a known external API.
+
+See [`webviews.md`](./webviews.md) for the panel runtime and the
+`window.nodalcore.{postMessage,onMessage}` surface available to panel JS.
+
+## SDK version compatibility
+
+Every release of `@nodalcore/sdk` ships an `SDK_VERSION` constant
+(`packages/sdk/src/version.ts`). The installer rejects manifests whose
+declared `sdkVersion` range doesn't satisfy the host's `SDK_VERSION`. Bump
+that constant alongside `packages/sdk/package.json` on every SDK release —
+forgetting will silently let mismatched plugins install.
 
 ## Registry index entry
 
 When a plugin is submitted to the central registry, a `RegistryPluginEntry`
-record is added to `index.json` on the registry GitHub Pages repo:
+record is added to `index.json`. The shape is:
 
 ```jsonc
 {
@@ -151,10 +285,11 @@ record is added to `index.json` on the registry GitHub Pages repo:
   "author":         { "name": "…", "url": "…" },
   "repository":     "https://github.com/…",
   "manifestUrl":    "https://raw.githubusercontent.com/…/nodal.json",
+  "artifacts":      [ /* see plugin-packaging.md */ ],
   "installs":       0,
   "updatedAt":      "2026-01-01T00:00:00.000Z"
 }
 ```
 
-The `manifestUrl` field is used by the installer to fetch the full `nodal.json`
-and resolve the git repository URL for cloning.
+For installation rules (artifact preference, fallback to git clone, integrity
+verification), see [`plugin-packaging.md`](./plugin-packaging.md).
