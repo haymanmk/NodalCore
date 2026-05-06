@@ -22,22 +22,28 @@ const execFileAsync = promisify(execFile)
 const PLUGINS_DIR = path.join(os.homedir(), '.nodalcore', 'plugins')
 const REGISTRY_FILE = path.join(os.homedir(), '.nodalcore', 'registry.json')
 
-// Minimal JSON Schema for nodal.json validation
+// Minimal JSON Schema for nodal.json validation.
+// Accepts both legacy shape (top-level `settingsSchema`/`entry`) and new shape
+// (`contributes.configuration`/`main`). The hard-cutover commit tightens this.
 const MANIFEST_SCHEMA = {
   type: 'object' as const,
-  required: ['id', 'name', 'version', 'sdkVersion', 'type', 'settingsSchema', 'permissions'],
+  required: ['id', 'name', 'version', 'sdkVersion', 'type', 'permissions'],
   properties: {
     id: { type: 'string' as const, minLength: 1 },
     name: { type: 'string' as const, minLength: 1 },
     version: { type: 'string' as const },
     sdkVersion: { type: 'string' as const },
     type: { type: 'string' as const, enum: ['device-bridge', 'standalone-tool'] },
+    main: { type: 'string' as const },
+    entry: { type: 'string' as const },
+    executable: { type: 'string' as const },
     settingsSchema: { type: 'object' as const },
     permissions: { type: 'array' as const, items: { type: 'string' as const } },
     connectionType: {
       type: 'string' as const,
       enum: ['serial', 'usb', 'bluetooth', 'tcp', 'mqtt'],
     },
+    contributes: { type: 'object' as const },
   },
   additionalProperties: true,
 }
