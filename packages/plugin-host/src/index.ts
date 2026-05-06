@@ -45,3 +45,6 @@ export type {
   WindowMessageEmitter,
   WindowMessagePayload,
 } from './host-api/server.js'
+
+export { startHostApiGrpcServer } from './host-api/grpc-server.js'
+export type { HostApiGrpcServer } from './host-api/grpc-server.js'

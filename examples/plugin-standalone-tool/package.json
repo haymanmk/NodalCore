@@ -4,9 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
     "start": "node bin/tool.js"
   },
   "dependencies": {
     "@nodalcore/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0"
   }
 }

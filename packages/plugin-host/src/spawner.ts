@@ -2,6 +2,8 @@ import path from 'node:path'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { PLUGINS_DIR, readAndValidateManifest } from './installer.js'
 import type { PluginManifest } from '@nodalcore/sdk'
+import { registerHostApiHandlers } from './host-api/server.js'
+import { startHostApiGrpcServer, type HostApiGrpcServer } from './host-api/grpc-server.js'
 
 interface SpawnedTool {
   pluginId: string
@@ -9,6 +11,8 @@ interface SpawnedTool {
   process: ChildProcess
   /** gRPC port the tool is listening on (parsed from stdout) */
   port: number
+  /** Host-side HostAPI gRPC server dedicated to this tool */
+  hostServer: HostApiGrpcServer
 }
 
 const running = new Map<string, SpawnedTool>()
@@ -24,9 +28,14 @@ function resolveLaunchCommand(execPath: string): [string, string[]] {
 
 /**
  * Spawn a standalone-tool plugin executable.
- * The executable must print a single line to stdout in the format:
- *   NODALCORE_READY <port>
- * within 10 seconds, signalling that its gRPC server is up.
+ *
+ * Sequence:
+ *   1. Start the host's HostAPI gRPC server on a random localhost port.
+ *   2. Pass that port via `NODALCORE_HOST_PORT` so the tool can dial in
+ *      *before* it activates and prints `NODALCORE_READY`. Two channels
+ *      (host→tool, tool→host) are alive throughout activation.
+ *   3. Wait for the tool to print `NODALCORE_READY <port>` on stdout
+ *      (10s timeout) — its own gRPC service port.
  */
 export async function spawnTool(pluginId: string): Promise<SpawnedTool> {
   const pluginDir = path.join(PLUGINS_DIR, pluginId)
@@ -39,6 +48,9 @@ export async function spawnTool(pluginId: string): Promise<SpawnedTool> {
     throw new Error(`Plugin ${pluginId} has no executable field in nodal.json`)
   }
 
+  registerHostApiHandlers()
+  const hostServer = await startHostApiGrpcServer()
+
   const execPath = path.resolve(pluginDir, manifest.executable)
   const [command, args] = resolveLaunchCommand(execPath)
 
@@ -48,16 +60,26 @@ export async function spawnTool(pluginId: string): Promise<SpawnedTool> {
       ...process.env,
       NODALCORE_PLUGIN_ID: pluginId,
       NODALCORE_PLUGIN_DIR: pluginDir,
+      NODALCORE_HOST_PORT: String(hostServer.port),
     },
     stdio: ['pipe', 'pipe', 'pipe'],
   })
 
-  const port = await waitForReady(child, pluginId)
+  let port: number
+  try {
+    port = await waitForReady(child, pluginId)
+  } catch (err) {
+    await hostServer.stop().catch(() => {})
+    throw err
+  }
 
-  const tool: SpawnedTool = { pluginId, manifest, process: child, port }
+  const tool: SpawnedTool = { pluginId, manifest, process: child, port, hostServer }
   running.set(pluginId, tool)
 
-  child.on('exit', () => running.delete(pluginId))
+  child.on('exit', () => {
+    running.delete(pluginId)
+    void hostServer.stop().catch(() => {})
+  })
 
   return tool
 }
@@ -66,6 +88,7 @@ export async function stopTool(pluginId: string): Promise<void> {
   const tool = running.get(pluginId)
   if (!tool) return
   tool.process.kill('SIGTERM')
+  await tool.hostServer.stop().catch(() => {})
   running.delete(pluginId)
 }
 

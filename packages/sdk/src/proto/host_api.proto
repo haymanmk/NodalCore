@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package nodalcore.host.v1;
+
+option java_package = "io.nodalcore.host.v1";
+option java_multiple_files = true;
+
+// HostAPI is the channel a standalone-tool plugin uses to invoke host
+// capabilities (window, workspace, …). Method names and payload shapes
+// match the Node-IPC envelope used by device-bridge plugins so both
+// transports route through the same broker on the host side.
+//
+// args_json / result_json are JSON-encoded strings rather than typed
+// messages so the host can register new host methods without
+// re-generating proto stubs in every plugin language.
+service HostAPI {
+  rpc Request(HostRequest) returns (HostResponse);
+}
+
+message HostRequest {
+  string plugin_id = 1;
+  string method    = 2;
+  string args_json = 3;
+}
+
+message HostResponse {
+  string result_json = 1;
+  string error       = 2;
+}

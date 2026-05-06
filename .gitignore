@@ -6,3 +6,6 @@ out/
 .env
 .DS_Store
 
+# Built bundle for the standalone-tool example (run `pnpm --filter example-image-processor build` to regenerate)
+examples/plugin-standalone-tool/bin/
+

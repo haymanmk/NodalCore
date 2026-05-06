@@ -2,6 +2,8 @@ export type { PluginManifest, PluginType, ConnectionType, Permission } from './t
 
 export { SDK_VERSION } from './version.js'
 
+export { HOST_API_PROTO_TEXT } from './proto/host-api-text.js'
+
 export type {
   Contributes,
   ThemeContribution,
@@ -37,6 +39,7 @@ export type {
 
 export {
   createIpcTransport,
+  createGrpcTransport,
   createExtensionContext,
   coalesceLastWins,
 } from './host/index.js'

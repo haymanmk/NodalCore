@@ -142,7 +142,12 @@ export async function installPlugin(options: InstallOptions): Promise<PluginMani
     await execFileAsync('git', ['clone', '--depth', '1', resolved.url, stagingDir])
     log('Clone complete.')
   } else {
-    stagingDir = resolved.dir
+    // Copy the user's source dir into a staging path. atomicReplaceDir below
+    // RENAMES the staging dir into place, so passing resolved.dir directly
+    // would move the user's working tree out from under them.
+    stagingDir = path.join(PLUGINS_DIR, `_tmp_local_${Date.now()}`)
+    log(`Copying ${resolved.dir} → staging…`)
+    await fs.cp(resolved.dir, stagingDir, { recursive: true, dereference: false })
   }
 
   const manifest = await readAndValidateManifest(stagingDir)
