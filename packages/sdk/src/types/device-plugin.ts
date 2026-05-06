@@ -1,4 +1,3 @@
-import type { JSONSchema7 } from 'json-schema'
 import type { ConnectionType } from './manifest.js'
 
 // ---------------------------------------------------------------------------
@@ -61,16 +60,21 @@ export type SettingsRecord = Record<string, unknown>
 /**
  * Abstract base class that every device-bridge plugin must extend.
  *
+ * Settings have moved out of the plugin: use `host.workspace.getConfiguration()`
+ * from the activate(ctx) entry point if you need to read user-configured values.
+ *
  * @example
  * ```ts
- * import { DevicePlugin, SerialConnectionOptions, SettingsRecord } from '@nodalcore/sdk'
+ * import { DevicePlugin, type ExtensionContext } from '@nodalcore/sdk'
  *
  * export default class MyDevice extends DevicePlugin {
- *   async connect(options: SerialConnectionOptions) { ... }
+ *   readonly connectionType = 'serial' as const
+ *   async connect(options) { ... }
  *   async disconnect() { ... }
- *   getSettingsSchema() { return { ... } }
- *   async readSettings() { return { ... } }
- *   async writeSettings(settings) { ... }
+ * }
+ *
+ * export async function activate(ctx: ExtensionContext) {
+ *   await ctx.window.showMessage('Plugin activated')
  * }
  * ```
  */
@@ -82,20 +86,4 @@ export abstract class DevicePlugin {
 
   /** Close the connection and release all resources. */
   abstract disconnect(): Promise<void>
-
-  /**
-   * Return the JSON Schema 7 that describes the device's settings.
-   * This is also declared in nodal.json, but the runtime value here
-   * takes precedence (allows dynamic schema based on detected firmware).
-   */
-  abstract getSettingsSchema(): JSONSchema7
-
-  /** Read the current settings from the device. */
-  abstract readSettings(): Promise<SettingsRecord>
-
-  /**
-   * Write partial settings to the device.
-   * Implementations must validate values against the schema before writing.
-   */
-  abstract writeSettings(settings: Partial<SettingsRecord>): Promise<void>
 }

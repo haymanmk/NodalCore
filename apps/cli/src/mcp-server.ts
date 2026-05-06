@@ -6,6 +6,9 @@ import {
   installPlugin,
   uninstallPlugin,
   loadDevicePlugin,
+  getConfiguration,
+  setConfiguration,
+  getInstalledPlugin,
 } from '@nodalcore/plugin-host'
 import { searchPlugins } from '@nodalcore/registry-client'
 import type { ConnectionOptions } from '@nodalcore/sdk'
@@ -132,19 +135,10 @@ export async function startMcpServer(): Promise<void> {
 
   server.tool(
     'read_settings',
-    'Read current settings of a connected plugin',
+    'Read a plugin\'s persisted configuration from the host configuration store',
     { pluginId: z.string() },
     async ({ pluginId }) => {
-      const session = sessions.get(pluginId)
-      if (!session) {
-        return {
-          content: [
-            { type: 'text' as const, text: JSON.stringify({ error: 'No active session' }) },
-          ],
-          isError: true,
-        }
-      }
-      const values = await session.readSettings()
+      const values = await getConfiguration(pluginId)
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(values, null, 2) }],
       }
@@ -153,19 +147,10 @@ export async function startMcpServer(): Promise<void> {
 
   server.tool(
     'write_settings',
-    'Write settings to a connected plugin',
+    'Merge values into a plugin\'s persisted configuration in the host configuration store',
     { pluginId: z.string(), settings: z.record(z.unknown()) },
     async ({ pluginId, settings }) => {
-      const session = sessions.get(pluginId)
-      if (!session) {
-        return {
-          content: [
-            { type: 'text' as const, text: JSON.stringify({ error: 'No active session' }) },
-          ],
-          isError: true,
-        }
-      }
-      await session.writeSettings(settings)
+      await setConfiguration(pluginId, settings)
       return {
         content: [
           {
@@ -179,19 +164,23 @@ export async function startMcpServer(): Promise<void> {
 
   server.tool(
     'get_settings_schema',
-    'Get the JSON Schema for a connected plugin\'s settings',
+    'Get the JSON Schema for a plugin\'s contributes.configuration block',
     { pluginId: z.string() },
     async ({ pluginId }) => {
-      const session = sessions.get(pluginId)
-      if (!session) {
+      const entry = await getInstalledPlugin(pluginId)
+      const cfg = entry?.manifest.contributes?.configuration
+      if (!cfg) {
         return {
           content: [
-            { type: 'text' as const, text: JSON.stringify({ error: 'No active session' }) },
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ error: 'Plugin declares no contributes.configuration' }),
+            },
           ],
           isError: true,
         }
       }
-      const schema = await session.getSettingsSchema()
+      const schema = { type: 'object', title: cfg.title, properties: cfg.properties }
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(schema, null, 2) }],
       }

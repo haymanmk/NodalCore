@@ -24,3 +24,17 @@ export type {
 export { DevicePlugin } from './types/device-plugin.js'
 
 export type { StandaloneTool } from './types/standalone-tool.js'
+
+export type {
+  Transport,
+  RequestHandler,
+  ExtensionContext,
+  WindowApi,
+  WorkspaceApi,
+} from './host/index.js'
+
+export {
+  createIpcTransport,
+  createExtensionContext,
+  coalesceLastWins,
+} from './host/index.js'

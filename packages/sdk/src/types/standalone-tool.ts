@@ -1,11 +1,13 @@
-import type { JSONSchema7 } from 'json-schema'
-
 /**
- * Interface that every standalone-tool plugin must implement.
+ * Interface that every standalone-tool plugin can implement.
  *
  * A standalone tool is an independent process (any language) that communicates
  * with NodalCore over the Connect/gRPC protocol. The plugin-host spawns the
  * executable and connects to it as a gRPC client.
+ *
+ * Tools also dial back to the host's gRPC HostAPI (port supplied via the
+ * NODALCORE_HOST_PORT env var) so they can call `host.window.showMessage` etc.
+ * Settings are read from the host configuration store, not held inside the tool.
  *
  * @example
  * ```ts
@@ -31,10 +33,4 @@ export interface StandaloneTool {
    * typed client at runtime.
    */
   getProtoDefinition(): string
-
-  /**
-   * Optional: return the JSON Schema describing the tool's settings.
-   * If omitted, the schema from nodal.json is used.
-   */
-  getSettingsSchema?(): JSONSchema7
 }

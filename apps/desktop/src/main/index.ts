@@ -11,6 +11,8 @@ import {
   reconcileRegistry,
   getConfiguration,
   setConfiguration,
+  registerHostApiHandlers,
+  setWindowMessageEmitter,
 } from '@nodalcore/plugin-host'
 import type { ConnectionOptions } from '@nodalcore/sdk'
 
@@ -40,6 +42,10 @@ function createWindow() {
 
 app.whenReady().then(() => {
   reconcileRegistry().catch(console.error)
+  registerHostApiHandlers()
+  setWindowMessageEmitter((pluginId, payload) => {
+    mainWindow?.webContents.send('host:window:showMessage', { pluginId, ...payload })
+  })
   registerIpcHandlers()
   createWindow()
 

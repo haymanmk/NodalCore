@@ -1,0 +1,5 @@
+export type { Transport, RequestHandler } from './transport.js'
+export type { ExtensionContext, WindowApi, WorkspaceApi } from './extension-context.js'
+export { createExtensionContext } from './extension-context.js'
+export { createIpcTransport } from './ipc-adapter.js'
+export { coalesceLastWins } from './coalesce.js'

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import './styles/index.css'
 import { StorePage } from './pages/StorePage.js'
 import { InstalledPage } from './pages/InstalledPage.js'
+import { HostMessageToast } from './components/HostMessageToast.js'
 
 type Tab = 'store' | 'installed'
 
@@ -47,6 +48,8 @@ export function App() {
       <main className="app__main">
         {tab === 'store' ? <StorePage /> : <InstalledPage />}
       </main>
+
+      <HostMessageToast />
     </div>
   )
 }

@@ -1,5 +1,13 @@
 import * as readline from 'node:readline'
-import { listInstalledPlugins, installPlugin, uninstallPlugin, loadDevicePlugin } from '@nodalcore/plugin-host'
+import {
+  listInstalledPlugins,
+  installPlugin,
+  uninstallPlugin,
+  loadDevicePlugin,
+  getConfiguration,
+  setConfiguration,
+  getInstalledPlugin,
+} from '@nodalcore/plugin-host'
 import { searchPlugins } from '@nodalcore/registry-client'
 import type { ConnectionOptions } from '@nodalcore/sdk'
 
@@ -178,14 +186,15 @@ async function handleDisconnect(): Promise<void> {
 }
 
 async function handleSettings(args: string[]): Promise<void> {
-  if (!state.activePlugin) {
-    console.log('No active connection. Connect to a plugin first.')
+  if (!state.activePluginId) {
+    console.log('No active plugin. Connect to one first.')
     return
   }
+  const pluginId = state.activePluginId
   const sub = args[0]
   switch (sub) {
     case 'get': {
-      const values = await state.activePlugin.readSettings()
+      const values = await getConfiguration(pluginId)
       console.log(JSON.stringify(values, null, 2))
       break
     }
@@ -197,18 +206,19 @@ async function handleSettings(args: string[]): Promise<void> {
         return
       }
       let parsed: unknown = raw
-      try {
-        parsed = JSON.parse(raw)
-      } catch {
-        /* keep as string */
-      }
-      await state.activePlugin.writeSettings({ [key]: parsed })
+      try { parsed = JSON.parse(raw) } catch { /* keep as string */ }
+      await setConfiguration(pluginId, { [key]: parsed })
       console.log(`  ${key} = ${JSON.stringify(parsed)}`)
       break
     }
     case 'schema': {
-      const schema = await state.activePlugin.getSettingsSchema()
-      console.log(JSON.stringify(schema, null, 2))
+      const entry = await getInstalledPlugin(pluginId)
+      const cfg = entry?.manifest.contributes?.configuration
+      if (!cfg) {
+        console.log('  Plugin declares no contributes.configuration')
+        return
+      }
+      console.log(JSON.stringify({ type: 'object', title: cfg.title, properties: cfg.properties }, null, 2))
       break
     }
     default:

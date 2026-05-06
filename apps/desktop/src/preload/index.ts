@@ -1,5 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { IpcRendererEvent } from 'electron'
 import type { ConnectionOptions, SettingsRecord } from '@nodalcore/sdk'
+
+interface HostWindowMessage {
+  pluginId: string
+  message: string
+  level?: 'info' | 'warning' | 'error'
+}
 
 /**
  * Exposes a safe, typed API to the renderer process via window.__nodalcore.
@@ -26,4 +33,13 @@ contextBridge.exposeInMainWorld('__nodalcore', {
   startTool: (id: string) => ipcRenderer.invoke('tool:start', id),
 
   stopTool: (id: string) => ipcRenderer.invoke('tool:stop', id),
+
+  /** Subscribe to plugin → host.window.showMessage events. Returns an unsubscribe fn. */
+  onHostMessage: (handler: (msg: HostWindowMessage) => void) => {
+    const listener = (_e: IpcRendererEvent, msg: HostWindowMessage) => handler(msg)
+    ipcRenderer.on('host:window:showMessage', listener)
+    return () => {
+      ipcRenderer.off('host:window:showMessage', listener)
+    }
+  },
 })

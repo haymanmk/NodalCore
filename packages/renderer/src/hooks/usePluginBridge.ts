@@ -15,6 +15,12 @@ interface InstalledPluginEntry {
   status: 'idle' | 'running' | 'error'
 }
 
+export interface HostWindowMessage {
+  pluginId: string
+  message: string
+  level?: 'info' | 'warning' | 'error'
+}
+
 interface NodalCoreBridge {
   listInstalled: () => Promise<InstalledPluginEntry[]>
   install: (idOrUrl: string) => Promise<void>
@@ -25,6 +31,7 @@ interface NodalCoreBridge {
   stopTool: (id: string) => Promise<void>
   readSettings: (id: string) => Promise<SettingsRecord>
   writeSettings: (id: string, settings: Partial<SettingsRecord>) => Promise<void>
+  onHostMessage?: (handler: (msg: HostWindowMessage) => void) => () => void
 }
 
 function getBridge(): NodalCoreBridge {
@@ -44,6 +51,10 @@ function getBridge(): NodalCoreBridge {
     readSettings: async () => ({}),
     writeSettings: async () => { throw new Error('Write not available in web mode') },
   }
+}
+
+export function getNodalCoreBridge(): NodalCoreBridge {
+  return getBridge()
 }
 
 export function usePluginBridge() {

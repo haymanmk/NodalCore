@@ -1,50 +1,65 @@
 /**
- * Plugin-host worker — runs in a child process (forked by loader.ts).
- * Receives the plugin entry path as argv[2], dynamic-imports it,
- * and dispatches method calls from the parent over Node IPC.
+ * Plugin-host worker — runs in a forked child process.
+ *
+ * Bidirectional IPC:
+ *   host → plugin: 'init' | 'connect' | 'disconnect' | 'shutdown'
+ *   plugin → host: 'window.showMessage' | 'workspace.getConfiguration' | …
+ *
+ * Both directions share the same `{ kind: 'request' | 'response', seq, … }`
+ * envelope (see @nodalcore/sdk/host/ipc-adapter.ts). Plugins consume the
+ * plugin → host direction through `ExtensionContext`, never directly.
  */
 
+import { createIpcTransport, createExtensionContext } from '@nodalcore/sdk'
+
 const entryPath = process.argv[2]
+const pluginId = process.argv[3] ?? 'unknown'
+
 if (!entryPath) {
-  process.send?.({ seq: 0, ok: false, error: 'No entry path provided' })
+  process.send?.({ kind: 'response', seq: 0, error: 'No entry path provided' })
   process.exit(1)
 }
 
-let plugin: Record<string, (...args: unknown[]) => unknown> | null = null
+const transport = createIpcTransport()
 
-async function init() {
-  const mod = await import(entryPath)
-  const Ctor = mod.default ?? mod
-  plugin = typeof Ctor === 'function' ? new Ctor() : Ctor
+interface ConnectablePlugin {
+  connect(options: unknown): Promise<unknown> | unknown
+  disconnect(): Promise<unknown> | unknown
 }
 
-process.on(
-  'message',
-  async (msg: { seq: number; method: string; args: unknown }) => {
-    const { seq, method, args } = msg
+let pluginInstance: Partial<ConnectablePlugin> | null = null
+let deactivateFn: (() => unknown | Promise<unknown>) | null = null
 
-    try {
-      if (method === 'init') {
-        await init()
-        process.send?.({ seq, ok: true, result: null })
-        return
-      }
+transport.onRequest('init', async () => {
+  const mod = await import(entryPath)
+  const ctor = mod.default ?? mod
+  pluginInstance = (typeof ctor === 'function' ? new ctor() : ctor) as Partial<ConnectablePlugin>
 
-      if (!plugin) {
-        process.send?.({ seq, ok: false, error: 'Plugin not initialised' })
-        return
-      }
+  if (typeof mod.activate === 'function') {
+    const ctx = createExtensionContext(transport, pluginId)
+    await mod.activate(ctx)
+  }
+  if (typeof mod.deactivate === 'function') {
+    deactivateFn = mod.deactivate
+  }
+  return null
+})
 
-      const fn = plugin[method]
-      if (typeof fn !== 'function') {
-        process.send?.({ seq, ok: false, error: `Method not found: ${method}` })
-        return
-      }
+transport.onRequest('connect', async (args) => {
+  if (!pluginInstance?.connect) throw new Error('Plugin does not implement connect()')
+  return pluginInstance.connect(args)
+})
 
-      const result = await fn.call(plugin, args)
-      process.send?.({ seq, ok: true, result })
-    } catch (err) {
-      process.send?.({ seq, ok: false, error: String(err) })
-    }
-  },
-)
+transport.onRequest('disconnect', async () => {
+  if (!pluginInstance?.disconnect) throw new Error('Plugin does not implement disconnect()')
+  return pluginInstance.disconnect()
+})
+
+transport.onRequest('shutdown', async () => {
+  if (deactivateFn) {
+    try { await deactivateFn() } catch (err) { console.error('[plugin] deactivate failed:', err) }
+  }
+  pluginInstance = null
+  deactivateFn = null
+  return null
+})

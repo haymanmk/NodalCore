@@ -30,3 +30,18 @@ export {
   clearConfiguration,
   CONFIG_FILE,
 } from './configuration.js'
+
+export {
+  registerHostHandler,
+  dispatchHostRequest,
+} from './broker.js'
+export type { HostHandler } from './broker.js'
+
+export {
+  registerHostApiHandlers,
+  setWindowMessageEmitter,
+} from './host-api/server.js'
+export type {
+  WindowMessageEmitter,
+  WindowMessagePayload,
+} from './host-api/server.js'

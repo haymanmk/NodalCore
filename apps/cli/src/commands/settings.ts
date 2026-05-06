@@ -1,5 +1,9 @@
 import { Command } from 'commander'
-import { activeSessions } from './device.js'
+import {
+  getConfiguration,
+  setConfiguration,
+  getInstalledPlugin,
+} from '@nodalcore/plugin-host'
 import { printResult, printError } from '../helpers.js'
 
 export function registerSettingsCommands(program: Command): void {
@@ -7,15 +11,10 @@ export function registerSettingsCommands(program: Command): void {
 
   settings
     .command('get <plugin-id>')
-    .description('Read current settings of a connected plugin')
+    .description('Read this plugin\'s persisted configuration')
     .action(async (pluginId: string) => {
       try {
-        const session = activeSessions.get(pluginId)
-        if (!session) {
-          printError('NOT_CONNECTED', `No active session for ${pluginId}`)
-          return
-        }
-        const values = await session.readSettings()
+        const values = await getConfiguration(pluginId)
         printResult(values)
       } catch (err) {
         printError('SETTINGS_READ_FAILED', String(err))
@@ -27,13 +26,8 @@ export function registerSettingsCommands(program: Command): void {
     .description('Write a setting value')
     .action(async (pluginId: string, key: string, value: string) => {
       try {
-        const session = activeSessions.get(pluginId)
-        if (!session) {
-          printError('NOT_CONNECTED', `No active session for ${pluginId}`)
-          return
-        }
         const parsed = tryParse(value)
-        await session.writeSettings({ [key]: parsed })
+        await setConfiguration(pluginId, { [key]: parsed })
         printResult({ pluginId, key, value: parsed, updated: true })
       } catch (err) {
         printError('SETTINGS_WRITE_FAILED', String(err))
@@ -45,13 +39,17 @@ export function registerSettingsCommands(program: Command): void {
     .description('Show the JSON Schema for plugin settings')
     .action(async (pluginId: string) => {
       try {
-        const session = activeSessions.get(pluginId)
-        if (!session) {
-          printError('NOT_CONNECTED', `No active session for ${pluginId}`)
+        const entry = await getInstalledPlugin(pluginId)
+        if (!entry) {
+          printError('NOT_INSTALLED', `Plugin ${pluginId} is not installed`)
           return
         }
-        const schema = await session.getSettingsSchema()
-        printResult(schema)
+        const cfg = entry.manifest.contributes?.configuration
+        if (!cfg) {
+          printError('NO_SCHEMA', `Plugin ${pluginId} declares no contributes.configuration`)
+          return
+        }
+        printResult({ type: 'object', title: cfg.title, properties: cfg.properties })
       } catch (err) {
         printError('SCHEMA_FAILED', String(err))
       }
