@@ -23,3 +23,10 @@ export {
   IntegrityError,
 } from './artifact.js'
 export type { PlatformDescriptor } from './artifact.js'
+
+export {
+  getConfiguration,
+  setConfiguration,
+  clearConfiguration,
+  CONFIG_FILE,
+} from './configuration.js'

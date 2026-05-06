@@ -2,39 +2,39 @@
   "id": "example-multimeter",
   "name": "Example Multimeter Bridge",
   "version": "0.1.0",
-  "sdkVersion": "0.1.0",
+  "sdkVersion": "^0.2.0",
   "type": "device-bridge",
-  "entry": "dist/index.js",
+  "main": "dist/index.js",
   "icon": "icon.png",
   "connectionType": "serial",
-  "settingsSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "type": "object",
-    "properties": {
-      "unit": {
-        "type": "string",
-        "title": "Measurement Unit",
-        "enum": ["V", "mV", "A", "mA", "Ω", "kΩ"],
-        "default": "V"
-      },
-      "autoRange": {
-        "type": "boolean",
-        "title": "Auto Range",
-        "default": true
-      },
-      "sampleRate": {
-        "type": "number",
-        "title": "Sample Rate (Hz)",
-        "minimum": 1,
-        "maximum": 1000,
-        "default": 10
-      }
-    },
-    "required": ["unit", "autoRange", "sampleRate"]
-  },
   "permissions": ["serial"],
   "author": "NodalCore Team",
   "description": "Example device-bridge plugin demonstrating a multimeter with serial connection.",
   "repository": "https://github.com/nodalcore/example-multimeter",
-  "tags": ["example", "multimeter", "serial", "measurement"]
+  "tags": ["example", "multimeter", "serial", "measurement"],
+  "contributes": {
+    "configuration": {
+      "title": "Multimeter",
+      "properties": {
+        "unit": {
+          "type": "string",
+          "title": "Measurement Unit",
+          "enum": ["V", "mV", "A", "mA", "Ω", "kΩ"],
+          "default": "V"
+        },
+        "autoRange": {
+          "type": "boolean",
+          "title": "Auto Range",
+          "default": true
+        },
+        "sampleRate": {
+          "type": "number",
+          "title": "Sample Rate (Hz)",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 10
+        }
+      }
+    }
+  }
 }

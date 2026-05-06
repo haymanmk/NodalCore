@@ -25,11 +25,11 @@ export async function loadDevicePlugin(pluginId: string): Promise<DevicePlugin> 
   if (manifest.type !== 'device-bridge') {
     throw new Error(`Plugin ${pluginId} is not a device-bridge plugin`)
   }
-  if (!manifest.entry) {
-    throw new Error(`Plugin ${pluginId} has no entry field in nodal.json`)
+  if (!manifest.main) {
+    throw new Error(`Plugin ${pluginId} has no "main" field in nodal.json`)
   }
 
-  const entryPath = path.resolve(pluginDir, manifest.entry)
+  const entryPath = path.resolve(pluginDir, manifest.main)
   const workerPath = new URL('./worker.js', import.meta.url).pathname
 
   const child = fork(workerPath, [entryPath], {

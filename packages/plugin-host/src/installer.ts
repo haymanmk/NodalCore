@@ -22,9 +22,6 @@ const execFileAsync = promisify(execFile)
 const PLUGINS_DIR = path.join(os.homedir(), '.nodalcore', 'plugins')
 const REGISTRY_FILE = path.join(os.homedir(), '.nodalcore', 'registry.json')
 
-// Minimal JSON Schema for nodal.json validation.
-// Accepts both legacy shape (top-level `settingsSchema`/`entry`) and new shape
-// (`contributes.configuration`/`main`). The hard-cutover commit tightens this.
 const MANIFEST_SCHEMA = {
   type: 'object' as const,
   required: ['id', 'name', 'version', 'sdkVersion', 'type', 'permissions'],
@@ -35,9 +32,8 @@ const MANIFEST_SCHEMA = {
     sdkVersion: { type: 'string' as const },
     type: { type: 'string' as const, enum: ['device-bridge', 'standalone-tool'] },
     main: { type: 'string' as const },
-    entry: { type: 'string' as const },
     executable: { type: 'string' as const },
-    settingsSchema: { type: 'object' as const },
+    protoFile: { type: 'string' as const },
     permissions: { type: 'array' as const, items: { type: 'string' as const } },
     connectionType: {
       type: 'string' as const,
@@ -264,7 +260,27 @@ export async function readAndValidateManifest(pluginDir: string): Promise<Plugin
     throw new Error(`nodal.json validation failed: ${errors}`)
   }
 
-  return parsed as PluginManifest
+  const obj = parsed as Record<string, unknown>
+  if (obj.entry !== undefined) {
+    throw new Error(
+      `nodal.json uses deprecated "entry" field — rename to "main" (SDK >= 0.2.0)`,
+    )
+  }
+  if (obj.settingsSchema !== undefined) {
+    throw new Error(
+      `nodal.json uses deprecated "settingsSchema" field — move to "contributes.configuration.properties" (SDK >= 0.2.0)`,
+    )
+  }
+
+  const manifest = parsed as PluginManifest
+  if (manifest.type === 'device-bridge' && !manifest.main) {
+    throw new Error(`nodal.json: device-bridge plugins must declare a "main" field`)
+  }
+  if (manifest.type === 'standalone-tool' && !manifest.executable) {
+    throw new Error(`nodal.json: standalone-tool plugins must declare an "executable" field`)
+  }
+
+  return manifest
 }
 
 // ---------------------------------------------------------------------------

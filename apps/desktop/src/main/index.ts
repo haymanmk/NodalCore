@@ -9,6 +9,8 @@ import {
   spawnTool,
   stopTool,
   reconcileRegistry,
+  getConfiguration,
+  setConfiguration,
 } from '@nodalcore/plugin-host'
 import type { ConnectionOptions } from '@nodalcore/sdk'
 
@@ -79,15 +81,14 @@ function registerIpcHandlers() {
     return { success: true }
   })
 
-  // Settings
+  // Settings — backed by host-side configuration store (~/.nodalcore/configurations.json).
+  // Settings are no longer plugin-resident; plugins read them via host.workspace.getConfiguration.
   ipcMain.handle('settings:read', async (_event, pluginId: string) => {
-    const plugin = await loadDevicePlugin(pluginId)
-    return plugin.readSettings()
+    return getConfiguration(pluginId)
   })
 
   ipcMain.handle('settings:write', async (_event, pluginId: string, settings: Record<string, unknown>) => {
-    const plugin = await loadDevicePlugin(pluginId)
-    await plugin.writeSettings(settings)
+    await setConfiguration(pluginId, settings)
     return { success: true }
   })
 

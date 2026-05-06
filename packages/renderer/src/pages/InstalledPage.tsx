@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { JSONSchema7 } from 'json-schema'
 import { usePluginBridge } from '../hooks/usePluginBridge.js'
 import { SettingsPanel } from '../components/SettingsPanel.js'
 import type { SettingsRecord } from '@nodalcore/sdk'
@@ -28,6 +29,12 @@ function PluginIcon({ manifest }: { manifest: PluginManifest }) {
       <img src={manifest.icon} alt="" width={36} height={36} onError={() => setErr(true)} />
     </div>
   )
+}
+
+function configurationToSchema(
+  cfg: NonNullable<NonNullable<PluginManifest['contributes']>['configuration']>,
+): JSONSchema7 {
+  return { type: 'object', title: cfg.title, properties: cfg.properties }
 }
 
 export function InstalledPage() {
@@ -105,10 +112,10 @@ export function InstalledPage() {
               </div>
             </div>
 
-            {entry.status === 'running' && entry.manifest.settingsSchema && (
+            {entry.status === 'running' && entry.manifest.contributes?.configuration && (
               <SettingsPanel
                 pluginId={entry.manifest.id}
-                schema={entry.manifest.settingsSchema}
+                schema={configurationToSchema(entry.manifest.contributes.configuration)}
                 onSubmit={async (id: string, settings: SettingsRecord) => {
                   await writeSettings(id, settings)
                 }}

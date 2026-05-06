@@ -1,4 +1,3 @@
-import type { JSONSchema7 } from 'json-schema'
 import type { Contributes } from './contributes.js'
 
 export type ConnectionType = 'serial' | 'usb' | 'bluetooth' | 'tcp' | 'mqtt'
@@ -19,15 +18,10 @@ export interface PluginManifest {
   icon: string
   type: PluginType
   /**
-   * Activation entry. For device-bridge plugins, the JS/TS module that exports
-   * `activate(ctx)` (and optionally `deactivate()`). VSCode parity for `entry`.
+   * Activation entry for device-bridge plugins: the JS/TS module that exports
+   * `activate(ctx)` (and optionally `deactivate()`). VSCode parity.
    */
   main?: string
-  /**
-   * Deprecated alias for `main`. Removed in the manifest cutover commit.
-   * @deprecated use `main`
-   */
-  entry?: string
   /**
    * For standalone-tool plugins: path to the executable (relative to plugin root).
    * The process receives connection info via environment variables.
@@ -35,12 +29,6 @@ export interface PluginManifest {
   executable?: string
   /** Path to the plugin's .proto file, relative to the plugin root. Optional. */
   protoFile?: string
-  /**
-   * Deprecated. Use `contributes.configuration` instead.
-   * Removed in the manifest cutover commit.
-   * @deprecated use `contributes.configuration`
-   */
-  settingsSchema?: JSONSchema7
   /** Required connection type. Drives ConnectionOptions and auto-populates permissions. */
   connectionType?: ConnectionType
   /**

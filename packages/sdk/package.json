@@ -1,6 +1,6 @@
 {
   "name": "@nodalcore/sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "NodalCore plugin SDK — types, interfaces, and proto definitions for plugin developers",
   "type": "module",
   "main": "./dist/index.cjs",
