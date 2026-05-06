@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { Command } from 'commander'
 import { registerPluginCommands } from './commands/plugin.js'
 import { registerDeviceCommands } from './commands/device.js'
