@@ -114,3 +114,22 @@ export async function unloadDevicePlugin(pluginId: string): Promise<void> {
   entry.process.kill()
   loaded.delete(pluginId)
 }
+
+/**
+ * Issue a host → plugin request over the loaded plugin's IPC transport.
+ * Used by the panel webview routing to forward `views.message` calls into
+ * handlers a plugin registered via `ctx.views.onMessage(slotId, …)`.
+ * Throws if the plugin is not currently loaded — UI should ensure the
+ * device is connected before opening its panel.
+ */
+export function sendToPlugin(
+  pluginId: string,
+  method: string,
+  args: unknown,
+): Promise<unknown> {
+  const entry = loaded.get(pluginId)
+  if (!entry) {
+    throw new Error(`Plugin ${pluginId} is not loaded — connect the device first`)
+  }
+  return call(entry, method, args)
+}

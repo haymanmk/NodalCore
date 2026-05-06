@@ -44,4 +44,15 @@ contextBridge.exposeInMainWorld('__nodalcore', {
   },
 
   getContributions: () => ipcRenderer.invoke('contributions:list'),
+
+  showPanel: (pluginId: string, slotId: string, htmlPath: string) =>
+    ipcRenderer.invoke('workspace:show-panel', pluginId, slotId, htmlPath),
+
+  hidePanel: () => ipcRenderer.invoke('workspace:hide-panel'),
+
+  destroyPanel: (pluginId: string, slotId: string) =>
+    ipcRenderer.invoke('workspace:destroy-panel', pluginId, slotId),
+
+  setWorkspaceBounds: (bounds: { x: number; y: number; width: number; height: number }) =>
+    ipcRenderer.invoke('workspace:set-bounds', bounds),
 })

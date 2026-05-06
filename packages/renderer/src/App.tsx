@@ -2,13 +2,14 @@ import { useState } from 'react'
 import './styles/index.css'
 import { StorePage } from './pages/StorePage.js'
 import { InstalledPage } from './pages/InstalledPage.js'
+import { WorkspacePage } from './pages/WorkspacePage.js'
 import { HostMessageToast } from './components/HostMessageToast.js'
 import { ContributionsProvider } from './contributions/registry.js'
 import { ThemeProvider } from './contributions/ThemeProvider.js'
 import { ThemePicker } from './components/ThemePicker.js'
 import { StatusBar } from './components/StatusBar.js'
 
-type Tab = 'store' | 'installed'
+type Tab = 'store' | 'installed' | 'workspace'
 
 export function App() {
   const [tab, setTab] = useState<Tab>('store')
@@ -48,6 +49,12 @@ export function App() {
               >
                 Installed
               </button>
+              <button
+                className={`app__tab ${tab === 'workspace' ? 'app__tab--active' : ''}`}
+                onClick={() => setTab('workspace')}
+              >
+                Workspace
+              </button>
             </div>
 
             <div className="app__nav-spacer" />
@@ -55,7 +62,9 @@ export function App() {
           </nav>
 
           <main className="app__main">
-            {tab === 'store' ? <StorePage /> : <InstalledPage />}
+            {tab === 'store' && <StorePage />}
+            {tab === 'installed' && <InstalledPage />}
+            {tab === 'workspace' && <WorkspacePage />}
           </main>
 
           <StatusBar />

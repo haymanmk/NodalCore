@@ -35,6 +35,15 @@
           "default": 1920
         }
       }
+    },
+    "views": {
+      "panel": [
+        {
+          "id": "info",
+          "name": "Image Processor Info",
+          "html": "panel/index.html"
+        }
+      ]
     }
   }
 }

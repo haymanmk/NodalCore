@@ -8,7 +8,7 @@ export {
   PLUGINS_DIR,
 } from './installer.js'
 
-export { loadDevicePlugin, unloadDevicePlugin } from './loader.js'
+export { loadDevicePlugin, unloadDevicePlugin, sendToPlugin } from './loader.js'
 
 export { spawnTool, stopTool, getRunningTool, listRunningTools } from './spawner.js'
 
@@ -55,4 +55,5 @@ export type {
   AggregatedTheme,
   AggregatedSidebarSlot,
   AggregatedStatusBarSlot,
+  AggregatedPanelWebview,
 } from './contributions.js'

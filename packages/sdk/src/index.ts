@@ -35,6 +35,8 @@ export type {
   ExtensionContext,
   WindowApi,
   WorkspaceApi,
+  ViewsApi,
+  ViewMessageHandler,
 } from './host/index.js'
 
 export {

@@ -4,6 +4,7 @@ import type {
   ThemeContribution,
   DeclarativeViewContribution,
   StatusBarContribution,
+  WebviewContribution,
 } from '@nodalcore/sdk'
 import { PLUGINS_DIR } from './installer.js'
 import { listInstalledPlugins } from './installer.js'
@@ -31,10 +32,20 @@ export interface AggregatedStatusBarSlot {
   priority: number
 }
 
+export interface AggregatedPanelWebview {
+  pluginId: string
+  slotId: string
+  name: string
+  /** Path relative to the plugin install dir; empty if the plugin registers programmatically. */
+  htmlPath: string
+  csp?: WebviewContribution['csp']
+}
+
 export interface AggregatedContributions {
   themes: AggregatedTheme[]
   sidebar: AggregatedSidebarSlot[]
   statusBar: AggregatedStatusBarSlot[]
+  panels: AggregatedPanelWebview[]
 }
 
 async function loadThemeVars(
@@ -63,6 +74,7 @@ export async function listContributions(): Promise<AggregatedContributions> {
   const themes: AggregatedTheme[] = []
   const sidebar: AggregatedSidebarSlot[] = []
   const statusBar: AggregatedStatusBarSlot[] = []
+  const panels: AggregatedPanelWebview[] = []
 
   for (const entry of installed) {
     const { manifest } = entry
@@ -109,6 +121,19 @@ export async function listContributions(): Promise<AggregatedContributions> {
         })
       }
     }
+
+    const panelItems = c.views?.panel
+    if (panelItems) {
+      for (const slot of panelItems) {
+        panels.push({
+          pluginId,
+          slotId: slot.id,
+          name: slot.name,
+          htmlPath: slot.html ?? '',
+          csp: slot.csp,
+        })
+      }
+    }
   }
 
   // Stable order: by pluginId, then declaration order.
@@ -123,6 +148,9 @@ export async function listContributions(): Promise<AggregatedContributions> {
     if (a.alignment !== b.alignment) return a.alignment === 'left' ? -1 : 1
     return b.priority - a.priority
   })
+  panels.sort((a, b) =>
+    a.pluginId.localeCompare(b.pluginId) || a.slotId.localeCompare(b.slotId),
+  )
 
-  return { themes, sidebar, statusBar }
+  return { themes, sidebar, statusBar, panels }
 }

@@ -6,6 +6,7 @@ import {
   listInstalledPlugins,
   loadDevicePlugin,
   unloadDevicePlugin,
+  sendToPlugin,
   spawnTool,
   stopTool,
   reconcileRegistry,
@@ -16,8 +17,23 @@ import {
   listContributions,
 } from '@nodalcore/plugin-host'
 import type { ConnectionOptions } from '@nodalcore/sdk'
+import {
+  registerSchemePrivileges,
+  registerProtocolHandler,
+} from './webviews/protocol.js'
+import {
+  setParentWindow,
+  setPanelBounds,
+  showPanel,
+  hideActive,
+  destroy as destroyPanel,
+} from './webviews/manager.js'
+import { registerWebviewRouting } from './webviews/routing.js'
 
-// Keep a global reference to the window to prevent garbage collection
+// MUST run before app.whenReady() — privileged scheme registration is one of
+// the few things Electron locks once the app is ready.
+registerSchemePrivileges()
+
 let mainWindow: BrowserWindow | null = null
 
 function createWindow() {
@@ -38,6 +54,8 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
   }
 
+  setParentWindow(mainWindow)
+
   mainWindow.on('closed', () => { mainWindow = null })
 }
 
@@ -46,6 +64,21 @@ app.whenReady().then(() => {
   registerHostApiHandlers()
   setWindowMessageEmitter((pluginId, payload) => {
     mainWindow?.webContents.send('host:window:showMessage', { pluginId, ...payload })
+  })
+  registerProtocolHandler()
+  registerWebviewRouting({
+    invokeOnPlugin: async (pluginId, slotId, data) => {
+      try {
+        return await sendToPlugin(pluginId, 'views.message', { slotId, data })
+      } catch (err) {
+        // Standalone tools have no host → tool callback path today; treat as
+        // "panel handled it locally" rather than escalating.
+        if (err instanceof Error && err.message.includes('not loaded')) {
+          throw err
+        }
+        return null
+      }
+    },
   })
   registerIpcHandlers()
   createWindow()
@@ -78,7 +111,7 @@ function registerIpcHandlers() {
   })
 
   // Device-bridge plugins
-  ipcMain.handle('device:connect', async (_event, pluginId: string, options: ConnectionOptions) => {
+  ipcMain.handle('device:connect', async (_event, pluginId: string, _options: ConnectionOptions) => {
     await loadDevicePlugin(pluginId)
     return { success: true }
   })
@@ -110,9 +143,47 @@ function registerIpcHandlers() {
     return { success: true }
   })
 
-  // Aggregated declarative contributions (themes + sidebar/statusBar slots).
-  // The renderer re-pulls this after install/uninstall.
+  // Aggregated declarative contributions (themes + sidebar/statusBar slots + panels).
   ipcMain.handle('contributions:list', async () => {
     return listContributions()
   })
+
+  // Workspace tab — webview lifecycle.
+  ipcMain.handle(
+    'workspace:show-panel',
+    async (_event, pluginId: string, slotId: string, htmlPath: string) => {
+      const preloadPath = path.join(__dirname, '../preload/webview.js')
+      showPanel({ pluginId, slotId, htmlPath, preloadPath })
+      return { success: true }
+    },
+  )
+
+  ipcMain.handle('workspace:hide-panel', async () => {
+    hideActive()
+    return { success: true }
+  })
+
+  ipcMain.handle(
+    'workspace:destroy-panel',
+    async (_event, pluginId: string, slotId: string) => {
+      destroyPanel(pluginId, slotId)
+      return { success: true }
+    },
+  )
+
+  // Renderer reports the panel rectangle (in CSS pixels relative to the
+  // BrowserWindow content area). Main updates the active WebContentsView's
+  // bounds — main owns layout for the panel region per the no-overlap rule.
+  ipcMain.handle(
+    'workspace:set-bounds',
+    async (_event, bounds: { x: number; y: number; width: number; height: number }) => {
+      setPanelBounds({
+        x: Math.round(bounds.x),
+        y: Math.round(bounds.y),
+        width: Math.round(bounds.width),
+        height: Math.round(bounds.height),
+      })
+      return { success: true }
+    },
+  )
 }

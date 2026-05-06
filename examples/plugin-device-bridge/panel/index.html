@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Multimeter readout</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      html, body { margin: 0; height: 100%; background: #0a1626; color: #e2f1ff; }
+      body { display: flex; flex-direction: column; }
+      header {
+        padding: 14px 18px;
+        border-bottom: 1px solid rgba(120, 200, 255, 0.18);
+        font-size: 12px;
+        color: #7ea8c4;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+      }
+      main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        padding: 24px;
+      }
+      .reading {
+        font-size: 56px;
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+        color: #38bdf8;
+        text-shadow: 0 0 24px rgba(56, 189, 248, 0.35);
+      }
+      .reading small { font-size: 22px; color: #7dd3fc; margin-left: 8px; }
+      .ts { font-size: 11px; color: #4d6c85; font-family: ui-monospace, SFMono-Regular, monospace; }
+      button {
+        background: #163049;
+        color: #e2f1ff;
+        border: 1px solid rgba(120, 200, 255, 0.18);
+        border-radius: 6px;
+        padding: 8px 16px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      button:hover { border-color: #38bdf8; }
+    </style>
+  </head>
+  <body>
+    <header>Multimeter live readout</header>
+    <main>
+      <div>
+        <span id="value" class="reading">—</span>
+        <small id="unit"></small>
+      </div>
+      <div id="ts" class="ts">waiting for plugin…</div>
+      <button id="measure">Measure now</button>
+    </main>
+    <script>
+      const valueEl = document.getElementById('value')
+      const unitEl  = document.getElementById('unit')
+      const tsEl    = document.getElementById('ts')
+      const btn     = document.getElementById('measure')
+
+      function render(reading) {
+        if (!reading || typeof reading !== 'object') return
+        valueEl.textContent = String(reading.value)
+        unitEl.textContent  = reading.unit
+        tsEl.textContent    = new Date(reading.timestamp).toLocaleTimeString()
+      }
+
+      // Plugin → panel: live ticks pushed every second from activate().
+      window.nodalcore?.onMessage(render)
+
+      // Panel → plugin: explicit measurement on demand.
+      btn.addEventListener('click', async () => {
+        try {
+          const r = await window.nodalcore?.postMessage({ type: 'measure' })
+          render(r)
+        } catch (err) {
+          tsEl.textContent = 'measure failed: ' + err.message
+        }
+      })
+    </script>
+  </body>
+</html>

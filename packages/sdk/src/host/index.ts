@@ -1,5 +1,11 @@
 export type { Transport, RequestHandler } from './transport.js'
-export type { ExtensionContext, WindowApi, WorkspaceApi } from './extension-context.js'
+export type {
+  ExtensionContext,
+  WindowApi,
+  WorkspaceApi,
+  ViewsApi,
+  ViewMessageHandler,
+} from './extension-context.js'
 export { createExtensionContext } from './extension-context.js'
 export { createIpcTransport } from './ipc-adapter.js'
 export { createGrpcTransport } from './grpc-adapter.js'

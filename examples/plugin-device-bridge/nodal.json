@@ -51,6 +51,13 @@
           "alignment": "right",
           "priority": 10
         }
+      ],
+      "panel": [
+        {
+          "id": "readout",
+          "name": "Live Readout",
+          "html": "panel/index.html"
+        }
       ]
     }
   }

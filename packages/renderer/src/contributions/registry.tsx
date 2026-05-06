@@ -30,13 +30,26 @@ export interface ContributedStatusBarSlot {
   priority: number
 }
 
+export interface ContributedPanelWebview {
+  pluginId: string
+  slotId: string
+  name: string
+  htmlPath: string
+}
+
 export interface AggregatedContributions {
   themes: ContributedTheme[]
   sidebar: ContributedSidebarSlot[]
   statusBar: ContributedStatusBarSlot[]
+  panels: ContributedPanelWebview[]
 }
 
-const EMPTY: AggregatedContributions = { themes: [], sidebar: [], statusBar: [] }
+const EMPTY: AggregatedContributions = {
+  themes: [],
+  sidebar: [],
+  statusBar: [],
+  panels: [],
+}
 
 interface ContributionsContextValue {
   contributions: AggregatedContributions
