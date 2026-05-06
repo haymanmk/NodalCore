@@ -50,6 +50,10 @@ pnpm format
 | pnpm workspaces | Single lockfile, fast installs, strict hoisting |
 | electron-vite | Hot-reload for all three Electron targets (main/preload/renderer) in one config |
 | Source aliases in Vite | `@nodalcore/*` packages resolve to their TS source at dev time — no need to rebuild packages before testing in the app |
+| VSCode-style manifest (`contributes` block) | `nodal.json` separates metadata + activation from declarative contribution points (`themes`, `configuration`, sidebar/statusBar slots, panel webviews). Old top-level `entry`/`settingsSchema` are rejected by the installer. `main` is the activation entry for device-bridge plugins. |
+| Uniform host API | Plugins call `ctx.window.*` / `ctx.workspace.*` regardless of plugin type. Device-bridge uses Node IPC over the fork worker; standalone tools will use gRPC (commit 4). The SDK surface is identical; only the underlying transport differs. |
+| Host-side configuration store | Settings live in `~/.nodalcore/configurations.json`, not inside the plugin. Schemas come from `manifest.contributes.configuration`. The host owns reads/writes; plugins read via `ctx.workspace.getConfiguration()`. |
+| `sdkVersion` enforcement | `installer.ts` rejects manifests whose `sdkVersion` semver range doesn't satisfy the host's `SDK_VERSION` (`packages/sdk/src/version.ts`). Bump that constant alongside `packages/sdk/package.json` on every SDK release. |
 | RJSF for settings UI | Settings forms are driven entirely by the plugin's JSON Schema — no hand-coded form fields |
 | Child-process isolation for plugins | Device-bridge plugins run in `fork()`-ed workers; a crash or hang does not take down the host |
 | Static JSON registry on GitHub Pages | Zero ops — registry updates land via PR; 5-min TTL client-side cache |
@@ -67,12 +71,17 @@ User clicks Install
 User clicks Connect
   → IPC: device:connect
   → main: loadDevicePlugin(id)            ← plugin-host/loader.ts
-      fork() worker → dynamic import of plugin entry
-      Node IPC proxy returned to main process
+      fork() worker → dynamic import of plugin's `main` module
+      worker calls plugin's `activate(ctx)` if exported
+      bidirectional IPC envelope { kind: 'request' | 'response', seq, … }
+      plugin-side host requests routed through plugin-host/broker.ts
+      → host-api/server.ts handlers (window.showMessage, workspace.*)
 
 User edits settings → Apply
   → IPC: settings:write
-  → main: plugin.writeSettings(settings)  ← forwarded over IPC to worker
+  → main: setConfiguration(pluginId, settings)  ← plugin-host/configuration.ts
+      writes to ~/.nodalcore/configurations.json (host-side store)
+      plugins read via ctx.workspace.getConfiguration() — never the plugin proxy
 ```
 
 ## Important files
@@ -80,15 +89,21 @@ User edits settings → Apply
 | File | Purpose |
 |---|---|
 | `packages/sdk/src/types/manifest.ts` | `PluginManifest` — the `nodal.json` schema |
-| `packages/sdk/src/types/device-plugin.ts` | `DevicePlugin` abstract class |
-| `packages/plugin-host/src/installer.ts` | Install / uninstall, local registry at `~/.nodalcore/registry.json` |
-| `packages/plugin-host/src/loader.ts` | Fork + IPC proxy for device-bridge plugins |
+| `packages/sdk/src/types/contributes.ts` | `Contributes` block (themes, configuration, sidebar/statusBar, webviews) |
+| `packages/sdk/src/types/device-plugin.ts` | `DevicePlugin` abstract class (now just `connectionType` + `connect`/`disconnect`) |
+| `packages/sdk/src/host/index.ts` | Host API surface: `Transport`, `ExtensionContext`, `WindowApi`, `WorkspaceApi`, `createIpcTransport`, `createExtensionContext`, `coalesceLastWins` |
+| `packages/sdk/src/version.ts` | `SDK_VERSION` constant — keep in sync with `packages/sdk/package.json` |
+| `packages/plugin-host/src/installer.ts` | Install / uninstall, manifest validation, `sdkVersion` semver check, local registry at `~/.nodalcore/registry.json` |
+| `packages/plugin-host/src/configuration.ts` | Host-side settings store at `~/.nodalcore/configurations.json` |
+| `packages/plugin-host/src/broker.ts` | Single-source-of-truth router for plugin → host requests |
+| `packages/plugin-host/src/host-api/server.ts` | Registers `window.showMessage`, `workspace.getConfiguration`, `workspace.setConfiguration`; `setWindowMessageEmitter` lets the desktop shell forward toasts |
+| `packages/plugin-host/src/loader.ts` | Fork + bidirectional IPC envelope for device-bridge plugins |
 | `packages/plugin-host/src/spawner.ts` | Spawn + stdout handshake for standalone tools |
 | `packages/registry-client/src/index.ts` | `fetchIndex`, `searchPlugins`, `getPlugin` |
 | `packages/renderer/src/mockRegistry.ts` | 8 mock plugins shown when live registry is down |
 | `packages/renderer/src/hooks/usePluginBridge.ts` | Abstracts IPC bridge (Electron) vs. stub (web) |
-| `apps/desktop/src/main/index.ts` | All IPC handlers |
-| `apps/desktop/src/preload/index.ts` | `window.__nodalcore` contextBridge surface |
+| `apps/desktop/src/main/index.ts` | All IPC handlers; wires `setWindowMessageEmitter` to the renderer |
+| `apps/desktop/src/preload/index.ts` | `window.__nodalcore` contextBridge surface, including `onHostMessage` |
 | `apps/desktop/electron.vite.config.ts` | Source aliases for all workspace packages |
 
 ## Coding conventions
