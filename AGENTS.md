@@ -51,8 +51,11 @@ pnpm format
 | electron-vite | Hot-reload for all three Electron targets (main/preload/renderer) in one config |
 | Source aliases in Vite | `@nodalcore/*` packages resolve to their TS source at dev time — no need to rebuild packages before testing in the app |
 | VSCode-style manifest (`contributes` block) | `nodal.json` separates metadata + activation from declarative contribution points (`themes`, `configuration`, sidebar/statusBar slots, panel webviews). Old top-level `entry`/`settingsSchema` are rejected by the installer. `main` is the activation entry for device-bridge plugins. |
-| Uniform host API | Plugins call `ctx.window.*` / `ctx.workspace.*` regardless of plugin type. Device-bridge uses Node IPC over the fork worker; standalone tools will use gRPC (commit 4). The SDK surface is identical; only the underlying transport differs. |
+| Uniform host API | Plugins call `ctx.window.*` / `ctx.workspace.*` / `ctx.views.*` regardless of plugin type. Device-bridge uses Node IPC over the fork worker; standalone tools use gRPC (`HostAPI.Request` carrying JSON-encoded args). The SDK surface is identical; only the underlying transport differs. |
 | Host-side configuration store | Settings live in `~/.nodalcore/configurations.json`, not inside the plugin. Schemas come from `manifest.contributes.configuration`. The host owns reads/writes; plugins read via `ctx.workspace.getConfiguration()`. |
+| Panel webviews via `WebContentsView` | Plugin HTML loads in a native `WebContentsView` tiled into the Workspace tab — never an iframe, never overlapping the React shell. The renderer measures the panel rectangle and reports it via `workspace:set-bounds`; main owns layout. One panel visible at a time. |
+| `nodal-plugin://` privileged scheme | All panel HTML loads via `nodal-plugin://<pluginId>/<path>`, registered as privileged before `app.whenReady()`. The handler resolves under `~/.nodalcore/plugins/<id>/` with `..`/symlink defenses and applies a locked-down per-plugin-origin CSP. |
+| Plugins ship as bundles | The installer just copies; it does NOT run `npm install` or hoist `node_modules`. Both example plugins are bundled with tsup (`noExternal: [/.*/]` + `createRequire` banner) so the installed copy is self-contained. |
 | `sdkVersion` enforcement | `installer.ts` rejects manifests whose `sdkVersion` semver range doesn't satisfy the host's `SDK_VERSION` (`packages/sdk/src/version.ts`). Bump that constant alongside `packages/sdk/package.json` on every SDK release. |
 | RJSF for settings UI | Settings forms are driven entirely by the plugin's JSON Schema — no hand-coded form fields |
 | Child-process isolation for plugins | Device-bridge plugins run in `fork()`-ed workers; a crash or hang does not take down the host |
@@ -82,6 +85,23 @@ User edits settings → Apply
   → main: setConfiguration(pluginId, settings)  ← plugin-host/configuration.ts
       writes to ~/.nodalcore/configurations.json (host-side store)
       plugins read via ctx.workspace.getConfiguration() — never the plugin proxy
+
+User opens a panel webview (Workspace tab)
+  → IPC: workspace:show-panel(pluginId, slotId, htmlPath)
+  → main: WebContentsView created, loads nodal-plugin://<pluginId>/<htmlPath>
+      preload: apps/desktop/src/preload/webview.ts → window.nodalcore.{postMessage,onMessage}
+      renderer ResizeObserver reports area bounds → workspace:set-bounds → view.setBounds(...)
+
+Webview → plugin
+  → ipcRenderer.invoke('webview:msg-to-plugin', data)
+  → main: lookup (pluginId, slotId) by sender WebContents
+  → sendToPlugin(id, 'views.message', { slotId, data }) over the IPC envelope
+  → plugin's ctx.views.onMessage(slotId) handler returns a result, propagates back
+
+Plugin → webview
+  → ctx.views.postMessage(slotId, data)
+  → broker handler 'views.postMessage' → sendToPanel(pluginId, slotId, data)
+  → WebContents.send('webview:msg-from-plugin', data) → preload onMessage handler
 ```
 
 ## Important files
@@ -91,20 +111,28 @@ User edits settings → Apply
 | `packages/sdk/src/types/manifest.ts` | `PluginManifest` — the `nodal.json` schema |
 | `packages/sdk/src/types/contributes.ts` | `Contributes` block (themes, configuration, sidebar/statusBar, webviews) |
 | `packages/sdk/src/types/device-plugin.ts` | `DevicePlugin` abstract class (now just `connectionType` + `connect`/`disconnect`) |
-| `packages/sdk/src/host/index.ts` | Host API surface: `Transport`, `ExtensionContext`, `WindowApi`, `WorkspaceApi`, `createIpcTransport`, `createExtensionContext`, `coalesceLastWins` |
+| `packages/sdk/src/host/index.ts` | Host API surface: `Transport`, `ExtensionContext`, `WindowApi`, `WorkspaceApi`, `ViewsApi`, `createIpcTransport`, `createGrpcTransport`, `createExtensionContext`, `coalesceLastWins` |
 | `packages/sdk/src/version.ts` | `SDK_VERSION` constant — keep in sync with `packages/sdk/package.json` |
 | `packages/plugin-host/src/installer.ts` | Install / uninstall, manifest validation, `sdkVersion` semver check, local registry at `~/.nodalcore/registry.json` |
 | `packages/plugin-host/src/configuration.ts` | Host-side settings store at `~/.nodalcore/configurations.json` |
 | `packages/plugin-host/src/broker.ts` | Single-source-of-truth router for plugin → host requests |
 | `packages/plugin-host/src/host-api/server.ts` | Registers `window.showMessage`, `workspace.getConfiguration`, `workspace.setConfiguration`; `setWindowMessageEmitter` lets the desktop shell forward toasts |
-| `packages/plugin-host/src/loader.ts` | Fork + bidirectional IPC envelope for device-bridge plugins |
-| `packages/plugin-host/src/spawner.ts` | Spawn + stdout handshake for standalone tools |
+| `packages/plugin-host/src/loader.ts` | Fork + bidirectional IPC envelope for device-bridge plugins. Exports `sendToPlugin` so main can issue host → plugin requests (panel routing). |
+| `packages/plugin-host/src/spawner.ts` | Spawn + stdout handshake for standalone tools; starts the host gRPC server and passes `NODALCORE_HOST_PORT` to the child |
+| `packages/plugin-host/src/contributions.ts` | Aggregates `manifest.contributes` across installed plugins (themes with var maps loaded from disk, sidebar/statusBar slots, panel webviews) |
+| `packages/plugin-host/src/host-api/grpc-server.ts` | gRPC `HostAPI.Request` server for standalone tools; routes through the same broker as IPC |
 | `packages/registry-client/src/index.ts` | `fetchIndex`, `searchPlugins`, `getPlugin` |
 | `packages/renderer/src/mockRegistry.ts` | 8 mock plugins shown when live registry is down |
 | `packages/renderer/src/hooks/usePluginBridge.ts` | Abstracts IPC bridge (Electron) vs. stub (web) |
-| `apps/desktop/src/main/index.ts` | All IPC handlers; wires `setWindowMessageEmitter` to the renderer |
-| `apps/desktop/src/preload/index.ts` | `window.__nodalcore` contextBridge surface, including `onHostMessage` |
-| `apps/desktop/electron.vite.config.ts` | Source aliases for all workspace packages |
+| `apps/desktop/src/main/index.ts` | All IPC handlers; wires `setWindowMessageEmitter` and webview routing |
+| `apps/desktop/src/main/webviews/protocol.ts` | `nodal-plugin://` privileged-scheme registration + per-request handler with `..`/symlink defenses + per-plugin-origin CSP |
+| `apps/desktop/src/main/webviews/manager.ts` | `WebContentsView` lifecycle — create per (pluginId, slotId), single visible, bounds from renderer, hot-reload teardown |
+| `apps/desktop/src/main/webviews/routing.ts` | Bridges webview ↔ plugin via `webview:msg-to-plugin` / `views.postMessage` broker handler |
+| `apps/desktop/src/preload/index.ts` | BrowserWindow contextBridge: `onHostMessage`, `getContributions`, `showPanel`, `setWorkspaceBounds`, … |
+| `apps/desktop/src/preload/webview.ts` | Separate preload bundle for `WebContentsView`s — exposes `window.nodalcore.{postMessage,onMessage}` to plugin HTML |
+| `apps/desktop/electron.vite.config.ts` | Source aliases + multi-entry preload (`index` + `webview`) |
+| `packages/renderer/src/pages/WorkspacePage.tsx` | Third tab — panel launcher rail + ResizeObserver-reporting area; main draws the `WebContentsView` over it |
+| `packages/renderer/src/contributions/registry.tsx` | Fetches `__nodalcore.getContributions()`, exposes themes / sidebar / statusBar / panels via React context |
 
 ## Coding conventions
 
