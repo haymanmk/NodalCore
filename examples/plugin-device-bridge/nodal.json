@@ -35,6 +35,23 @@
           "default": 10
         }
       }
+    },
+    "themes": [
+      {
+        "id": "multimeter-blue",
+        "label": "Multimeter Blue",
+        "type": "dark",
+        "path": "themes/multimeter-blue.json"
+      }
+    ],
+    "views": {
+      "statusBar": [
+        {
+          "id": "current-reading",
+          "alignment": "right",
+          "priority": 10
+        }
+      ]
     }
   }
 }

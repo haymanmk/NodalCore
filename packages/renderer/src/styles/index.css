@@ -821,3 +821,79 @@ img.plugin-card__icon {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* ──────────────────────────────────────────────────────────
+   Theme picker — sits in the right side of the top nav
+   ────────────────────────────────────────────────────────── */
+.app__nav-spacer { flex: 1; }
+
+.theme-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.theme-picker__label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.theme-picker__select {
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color var(--transition);
+}
+
+.theme-picker__select:hover  { border-color: var(--border-strong); }
+.theme-picker__select:focus  { outline: none; border-color: var(--accent); }
+
+/* ──────────────────────────────────────────────────────────
+   Status bar — declarative slot chrome (filled by webviews in 5b)
+   ────────────────────────────────────────────────────────── */
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 16px;
+  height: 26px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.status-bar__group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-bar__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 10.5px;
+  cursor: default;
+  transition: border-color var(--transition);
+}
+
+.status-bar__pill:hover { border-color: var(--border-strong); }
+
+.status-bar__pill-plugin { color: var(--text-secondary); }
+.status-bar__pill-sep    { color: var(--text-muted); }
+.status-bar__pill-slot   { color: var(--text-primary); }

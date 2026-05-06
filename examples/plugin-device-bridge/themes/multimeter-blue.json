@@ -1,0 +1,18 @@
+{
+  "--bg":             "#0a1626",
+  "--surface":        "#102236",
+  "--surface-raised": "#163049",
+  "--surface-hover":  "#1d3d5d",
+  "--border":         "rgba(120, 200, 255, 0.10)",
+  "--border-strong":  "rgba(120, 200, 255, 0.18)",
+  "--border-accent":  "rgba(56, 189, 248, 0.4)",
+
+  "--accent":         "#38bdf8",
+  "--accent-hover":   "#7dd3fc",
+  "--accent-light":   "rgba(56, 189, 248, 0.12)",
+  "--accent-glow":    "rgba(56, 189, 248, 0.28)",
+
+  "--text-primary":   "#e2f1ff",
+  "--text-secondary": "#7ea8c4",
+  "--text-muted":     "#4d6c85"
+}

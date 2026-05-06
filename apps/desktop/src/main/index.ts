@@ -13,6 +13,7 @@ import {
   setConfiguration,
   registerHostApiHandlers,
   setWindowMessageEmitter,
+  listContributions,
 } from '@nodalcore/plugin-host'
 import type { ConnectionOptions } from '@nodalcore/sdk'
 
@@ -107,5 +108,11 @@ function registerIpcHandlers() {
   ipcMain.handle('tool:stop', async (_event, pluginId: string) => {
     await stopTool(pluginId)
     return { success: true }
+  })
+
+  // Aggregated declarative contributions (themes + sidebar/statusBar slots).
+  // The renderer re-pulls this after install/uninstall.
+  ipcMain.handle('contributions:list', async () => {
+    return listContributions()
   })
 }

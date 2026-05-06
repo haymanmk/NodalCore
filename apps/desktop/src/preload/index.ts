@@ -42,4 +42,6 @@ contextBridge.exposeInMainWorld('__nodalcore', {
       ipcRenderer.off('host:window:showMessage', listener)
     }
   },
+
+  getContributions: () => ipcRenderer.invoke('contributions:list'),
 })

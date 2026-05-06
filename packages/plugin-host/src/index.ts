@@ -48,3 +48,11 @@ export type {
 
 export { startHostApiGrpcServer } from './host-api/grpc-server.js'
 export type { HostApiGrpcServer } from './host-api/grpc-server.js'
+
+export { listContributions } from './contributions.js'
+export type {
+  AggregatedContributions,
+  AggregatedTheme,
+  AggregatedSidebarSlot,
+  AggregatedStatusBarSlot,
+} from './contributions.js'
