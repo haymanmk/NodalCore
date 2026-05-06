@@ -11,9 +11,9 @@ export interface RegistryArtifact {
   /** SHA-256 digest in `sha256:<hex>` format. */
   integrity: string
   /** Target `process.platform` (e.g. "linux", "darwin", "win32"). */
-  os: NodeJS.Platform
+  os: 'aix' | 'android' | 'darwin' | 'freebsd' | 'haiku' | 'linux' | 'openbsd' | 'sunos' | 'win32' | 'cygwin' | 'netbsd'
   /** Target `process.arch` (e.g. "x64", "arm64"). */
-  cpu: NodeJS.Architecture
+  cpu: 'arm' | 'arm64' | 'ia32' | 'mips' | 'mipsel' | 'ppc' | 'ppc64' | 'riscv64' | 's390' | 's390x' | 'x64' | 'loong64'
   /** Optional Linux libc selector. Ignored on non-Linux platforms. */
   libc?: 'glibc' | 'musl'
   /** Optional semver range describing the compatible Node.js runtime. */

@@ -1,6 +1,7 @@
 import * as readline from 'node:readline'
 import { listInstalledPlugins, installPlugin, uninstallPlugin, loadDevicePlugin } from '@nodalcore/plugin-host'
 import { searchPlugins } from '@nodalcore/registry-client'
+import type { ConnectionOptions } from '@nodalcore/sdk'
 
 interface ReplState {
   activePlugin: Awaited<ReturnType<typeof loadDevicePlugin>> | null
@@ -159,7 +160,7 @@ async function handleConnect(pluginId: string | undefined): Promise<void> {
   }
   console.log(`Loading ${pluginId}...`)
   const proxy = await loadDevicePlugin(pluginId)
-  await proxy.connect({})
+  await proxy.connect({} as ConnectionOptions)
   state.activePlugin = proxy
   state.activePluginId = pluginId
   console.log(`Connected to ${pluginId}`)

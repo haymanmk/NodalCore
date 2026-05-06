@@ -1,5 +1,6 @@
 import { Command } from 'commander'
 import { loadDevicePlugin } from '@nodalcore/plugin-host'
+import type { ConnectionOptions } from '@nodalcore/sdk'
 import { printResult, printError, printProgress } from '../helpers.js'
 
 const activeSessions = new Map<string, Awaited<ReturnType<typeof loadDevicePlugin>>>()
@@ -22,7 +23,7 @@ export function registerDeviceCommands(program: Command): void {
 
         const connectionOpts = buildConnectionOpts(opts)
         printProgress('Connecting...')
-        await pluginProxy.connect(connectionOpts)
+        await pluginProxy.connect(connectionOpts as unknown as ConnectionOptions)
 
         activeSessions.set(pluginId, pluginProxy)
         printResult({ pluginId, connected: true })

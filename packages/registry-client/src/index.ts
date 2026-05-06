@@ -8,9 +8,11 @@ export type { RegistryIndex, RegistryPluginEntry, RegistryArtifact }
  * Override via NODALCORE_REGISTRY_URL environment variable or the
  * `registryUrl` option on client methods.
  */
+const envRegistryUrl = (
+  globalThis as { process?: { env?: Record<string, string | undefined> } }
+).process?.env?.NODALCORE_REGISTRY_URL
 const DEFAULT_REGISTRY_URL =
-  (typeof process !== 'undefined' && process.env?.NODALCORE_REGISTRY_URL) ||
-  'https://haymanmk.github.io/NodalCore-Store/registry/index.json'
+  envRegistryUrl || 'https://haymanmk.github.io/NodalCore-Store/registry/index.json'
 
 let cachedIndex: RegistryIndex | null = null
 let cachedAt = 0

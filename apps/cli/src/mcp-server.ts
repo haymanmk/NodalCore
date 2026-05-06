@@ -8,6 +8,7 @@ import {
   loadDevicePlugin,
 } from '@nodalcore/plugin-host'
 import { searchPlugins } from '@nodalcore/registry-client'
+import type { ConnectionOptions } from '@nodalcore/sdk'
 
 const sessions = new Map<string, Awaited<ReturnType<typeof loadDevicePlugin>>>()
 
@@ -95,7 +96,7 @@ export async function startMcpServer(): Promise<void> {
     },
     async ({ pluginId, connectionOpts }) => {
       const proxy = await loadDevicePlugin(pluginId)
-      await proxy.connect(connectionOpts ?? {})
+      await proxy.connect((connectionOpts ?? {}) as unknown as ConnectionOptions)
       sessions.set(pluginId, proxy)
       return {
         content: [
