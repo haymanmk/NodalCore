@@ -1,5 +1,7 @@
 export type { PluginManifest, PluginType, ConnectionType, Permission } from './types/manifest.js'
 
+export { SDK_VERSION } from './version.js'
+
 export type {
   Contributes,
   ThemeContribution,

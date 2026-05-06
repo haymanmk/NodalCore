@@ -5,7 +5,8 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import _Ajv from 'ajv'
 import _addFormats from 'ajv-formats'
-import type { PluginManifest } from '@nodalcore/sdk'
+import semver from 'semver'
+import { SDK_VERSION, type PluginManifest } from '@nodalcore/sdk'
 import type { RegistryArtifact, RegistryPluginEntry } from '@nodalcore/registry-client'
 import { getPlugin } from '@nodalcore/registry-client'
 import {
@@ -278,6 +279,17 @@ export async function readAndValidateManifest(pluginDir: string): Promise<Plugin
   }
   if (manifest.type === 'standalone-tool' && !manifest.executable) {
     throw new Error(`nodal.json: standalone-tool plugins must declare an "executable" field`)
+  }
+
+  if (!semver.validRange(manifest.sdkVersion)) {
+    throw new Error(
+      `nodal.json: "sdkVersion" must be a valid semver range — got "${manifest.sdkVersion}"`,
+    )
+  }
+  if (!semver.satisfies(SDK_VERSION, manifest.sdkVersion, { includePrerelease: true })) {
+    throw new Error(
+      `Plugin "${manifest.id}" requires SDK ${manifest.sdkVersion}, but host SDK is ${SDK_VERSION}`,
+    )
   }
 
   return manifest
