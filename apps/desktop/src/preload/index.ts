@@ -58,4 +58,8 @@ contextBridge.exposeInMainWorld('__nodalcore', {
 
   /** Tell main the renderer has mounted; main flushes any queued toasts. */
   signalReady: () => ipcRenderer.invoke('host:ready'),
+
+  /** Read the last-used connection options for a plugin (or null if none stored). */
+  readConnection: (pluginId: string, expectedType: string) =>
+    ipcRenderer.invoke('connection:read', pluginId, expectedType),
 })
