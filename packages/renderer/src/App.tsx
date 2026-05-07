@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './styles/index.css'
 import { StorePage } from './pages/StorePage.js'
 import { InstalledPage } from './pages/InstalledPage.js'
@@ -8,11 +8,16 @@ import { ContributionsProvider } from './contributions/registry.js'
 import { ThemeProvider } from './contributions/ThemeProvider.js'
 import { ThemePicker } from './components/ThemePicker.js'
 import { StatusBar } from './components/StatusBar.js'
+import { getNodalCoreBridge } from './hooks/usePluginBridge.js'
 
 type Tab = 'store' | 'installed' | 'workspace'
 
 export function App() {
   const [tab, setTab] = useState<Tab>('store')
+
+  useEffect(() => {
+    getNodalCoreBridge().signalReady?.()
+  }, [])
 
   return (
     <ContributionsProvider>

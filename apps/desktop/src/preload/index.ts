@@ -55,4 +55,7 @@ contextBridge.exposeInMainWorld('__nodalcore', {
 
   setWorkspaceBounds: (bounds: { x: number; y: number; width: number; height: number }) =>
     ipcRenderer.invoke('workspace:set-bounds', bounds),
+
+  /** Tell main the renderer has mounted; main flushes any queued toasts. */
+  signalReady: () => ipcRenderer.invoke('host:ready'),
 })
