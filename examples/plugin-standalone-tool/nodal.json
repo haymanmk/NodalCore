@@ -2,7 +2,7 @@
   "id": "example-image-processor",
   "name": "Example Image Processor",
   "version": "0.1.0",
-  "sdkVersion": "^0.3.0",
+  "sdkVersion": ">=0.2.0",
   "type": "standalone-tool",
   "executable": "./bin/tool.js",
   "icon": "icon.png",
