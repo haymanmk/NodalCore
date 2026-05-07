@@ -3,6 +3,45 @@ import type { Transport, RequestHandler } from './transport.js'
 export interface WindowApi {
   /** Show a message to the user (toast in the desktop app, log in headless contexts). */
   showMessage(message: string, level?: 'info' | 'warning' | 'error'): Promise<void>
+  /**
+   * Passive native dialog with a single OK button. Use for "you should look
+   * at this" events that are louder than a toast but don't require a
+   * decision from the user.
+   */
+  showWarning(message: string, detail?: string): Promise<void>
+  /**
+   * Interactive native dialog. Resolves with the id of the button the user
+   * clicked, or with the cancel button's id if the user dismissed via Esc /
+   * the dialog's close button. If no button has `cancel: true` and the user
+   * dismisses, resolves with the id of the first button.
+   */
+  showModal(options: ShowModalOptions): Promise<string>
+}
+
+export interface ShowModalOptions {
+  /** Primary headline — short, one line. */
+  message: string
+  /** Optional second-line body. */
+  detail?: string
+  /** Native dialog icon. Defaults to 'info'. */
+  type?: 'info' | 'warning' | 'error' | 'question'
+  /** Buttons, left-to-right. Defaults to a single 'OK' button if omitted or empty. */
+  buttons?: ModalButton[]
+}
+
+export interface ModalButton {
+  /** Stable identifier returned from `showModal`. Never shown to the user. */
+  id: string
+  /** User-visible button label. */
+  label: string
+  /** Highlighted as the default action (Enter key). At most one. */
+  default?: boolean
+  /**
+   * Returned when the user presses Esc or closes the dialog.
+   * If no button has `cancel: true` and the user dismisses, the promise
+   * resolves with the id of the first button.
+   */
+  cancel?: boolean
 }
 
 export interface WorkspaceApi {
@@ -60,6 +99,13 @@ export function createExtensionContext(
     window: {
       async showMessage(message, level) {
         await transport.request('window.showMessage', { message, level })
+      },
+      async showWarning(message, detail) {
+        await transport.request('window.showWarning', { message, detail })
+      },
+      async showModal(options) {
+        const result = await transport.request('window.showModal', options)
+        return result as string
       },
     },
     workspace: {

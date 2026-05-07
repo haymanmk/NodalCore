@@ -32,6 +32,7 @@ interface NodalCoreBridge {
   readSettings: (id: string) => Promise<SettingsRecord>
   writeSettings: (id: string, settings: Partial<SettingsRecord>) => Promise<void>
   onHostMessage?: (handler: (msg: HostWindowMessage) => void) => () => void
+  signalReady?: () => Promise<void>
 }
 
 function getBridge(): NodalCoreBridge {

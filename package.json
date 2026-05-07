@@ -8,15 +8,19 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "typecheck": "pnpm -r typecheck",
+    "test": "vitest",
+    "test:run": "vitest run",
     "sdk:publish-local": "pnpm --filter @nodalcore/sdk build && pnpm --filter @nodalcore/sdk exec yalc publish --push",
     "sdk:remove-local": "pnpm --filter @nodalcore/sdk exec yalc installations clean @nodalcore/sdk"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
+    "@vitest/coverage-v8": "^4.1.5",
     "eslint": "^9.0.0",
     "prettier": "^3.0.0",
     "typescript": "^5.7.0",
+    "vitest": "^4.1.5",
     "yalc": "1.0.0-pre.53"
   },
   "engines": {
