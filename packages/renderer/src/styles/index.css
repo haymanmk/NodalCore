@@ -1043,3 +1043,90 @@ img.plugin-card__icon {
   font-size: 13px;
   pointer-events: none;
 }
+
+/* ============================================================
+   Connect dialog — modal that pops on the Installed-page Connect button.
+   ============================================================ */
+
+.connect-dialog__backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.connect-dialog {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.5rem;
+  min-width: 24rem;
+  max-width: 32rem;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+}
+
+.connect-dialog__header {
+  margin-bottom: 1rem;
+}
+
+.connect-dialog__title {
+  font-size: 1.1rem;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.connect-dialog__sub {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0.25rem 0 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.connect-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.connect-dialog__btn {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.connect-dialog__btn--submit {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.connect-dialog__btn--submit:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.connect-dialog__btn--submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.connect-dialog__btn--cancel {
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.connect-dialog__error {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  background: var(--error-bg);
+  color: var(--error);
+  border: 1px solid var(--error-border);
+  font-size: 0.85rem;
+}
