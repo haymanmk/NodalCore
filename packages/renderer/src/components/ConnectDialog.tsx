@@ -5,7 +5,7 @@ import type { ValidatorType } from '@rjsf/utils'
 import validator from '@rjsf/validator-ajv8'
 import type { JSONSchema7 } from 'json-schema'
 import type { ConnectionOptions, ConnectionType } from '@nodalcore/sdk'
-import { connectionSchemas } from '@nodalcore/sdk'
+import { connectionSchemas } from '@nodalcore/sdk/schemas/connection'
 
 export interface ConnectDialogProps {
   pluginId: string
