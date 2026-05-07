@@ -15,6 +15,7 @@ import {
   setConfiguration,
   registerHostApiHandlers,
   setWindowMessageEmitter,
+  setModalDispatcher,
   listContributions,
 } from '@nodalcore/plugin-host'
 import type { ConnectionOptions } from '@nodalcore/sdk'
@@ -30,10 +31,31 @@ import {
   destroy as destroyPanel,
 } from './webviews/manager.js'
 import { registerWebviewRouting } from './webviews/routing.js'
+import { createTray } from './tray.js'
+import {
+  bindWindow,
+  isWindowVisible,
+  isQuitting,
+  showWindow,
+} from './window-state.js'
+import { enqueue, drain } from './notifications/queue.js'
+import { showWarning, showModal } from './notifications/modal.js'
 
 // MUST run before app.whenReady() — privileged scheme registration is one of
 // the few things Electron locks once the app is ready.
 registerSchemePrivileges()
+
+// Single-instance: a second invocation of `nodalcore` while the app is
+// running in the tray should just re-show the existing window, not start
+// a second process.
+const gotLock = app.requestSingleInstanceLock()
+if (!gotLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    showWindow()
+  })
+}
 
 let mainWindow: BrowserWindow | null = null
 
@@ -55,17 +77,38 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
   }
 
+  bindWindow(mainWindow)
   setParentWindow(mainWindow)
 
-  mainWindow.on('closed', () => { mainWindow = null })
+  mainWindow.on('close', (e) => {
+    if (!isQuitting()) {
+      e.preventDefault()
+      mainWindow?.hide()
+    }
+  })
+
+  mainWindow.on('closed', () => {
+    bindWindow(null)
+    mainWindow = null
+  })
 }
 
 app.whenReady().then(() => {
   reconcileRegistry().catch(console.error)
   registerHostApiHandlers()
   setWindowMessageEmitter((pluginId, payload) => {
-    mainWindow?.webContents.send('host:window:showMessage', { pluginId, ...payload })
+    if (isWindowVisible()) {
+      mainWindow?.webContents.send('host:window:showMessage', { pluginId, ...payload })
+    } else {
+      enqueue({
+        pluginId,
+        message: payload.message,
+        level: payload.level ?? 'info',
+        ts: Date.now(),
+      })
+    }
   })
+  setModalDispatcher({ showWarning, showModal })
   registerProtocolHandler()
   registerWebviewRouting({
     invokeOnPlugin: async (pluginId, slotId, data) => {
@@ -82,6 +125,7 @@ app.whenReady().then(() => {
     },
   })
   registerIpcHandlers()
+  createTray()
   createWindow()
 
   app.on('activate', () => {
@@ -89,9 +133,10 @@ app.whenReady().then(() => {
   })
 })
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
-})
+// Note: `window-all-closed` is intentionally NOT handled. The tray "Quit"
+// item (which calls beginQuit() then app.quit()) is the only exit path —
+// closing the window via [X] is intercepted in createWindow() and routed
+// to mainWindow.hide() instead.
 
 // ---------------------------------------------------------------------------
 // IPC handlers — these are the safe API surface exposed to the renderer
@@ -227,4 +272,17 @@ function registerIpcHandlers() {
       return { success: true }
     },
   )
+
+  // Renderer signals it has mounted; drain any toasts that were emitted
+  // while the window was hidden and re-emit them so HostMessageToast can
+  // render them.
+  ipcMain.handle('host:ready', () => {
+    for (const t of drain()) {
+      mainWindow?.webContents.send('host:window:showMessage', {
+        pluginId: t.pluginId,
+        message: t.message,
+        level: t.level,
+      })
+    }
+  })
 }
