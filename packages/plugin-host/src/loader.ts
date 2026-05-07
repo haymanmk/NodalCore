@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
 import { fork, type ChildProcess } from 'node:child_process'
 import { PLUGINS_DIR, readAndValidateManifest } from './installer.js'
 import type { DevicePlugin, ConnectionOptions } from '@nodalcore/sdk'
@@ -118,6 +119,18 @@ export async function unloadDevicePlugin(pluginId: string): Promise<void> {
 }
 
 /**
+ * Resolve the directory of *this* module across both module formats.
+ * tsup's CJS emit replaces `import.meta` with an empty object literal, so
+ * `fileURLToPath(import.meta.url)` throws `ERR_INVALID_ARG_TYPE` at runtime.
+ * In CJS Node injects `__dirname` per-module, so we prefer it when defined
+ * and fall back to `import.meta.url` for the ESM path.
+ */
+function currentDir(): string {
+  if (typeof __dirname === 'string') return __dirname
+  return path.dirname(fileURLToPath(import.meta.url))
+}
+
+/**
  * Resolve the path to `worker.js` at runtime. We can't use
  * `new URL('./worker.js', import.meta.url)` because callers consume this
  * module from many layouts: tsup bundle (`dist/index.js` + sibling
@@ -127,27 +140,28 @@ export async function unloadDevicePlugin(pluginId: string): Promise<void> {
  * `src/worker.ts` is the file).
  */
 function locateWorker(): string {
-  const here = fileURLToPath(import.meta.url)
+  const here = currentDir()
   const candidates = [
     // tsup dist mode: dist/index.js → dist/worker.js
-    path.join(path.dirname(here), 'worker.js'),
+    path.join(here, 'worker.js'),
     // src mode: src/loader.ts → src/worker.ts (vitest, ts-node)
-    path.join(path.dirname(here), 'worker.ts'),
+    path.join(here, 'worker.ts'),
     // electron-vite bundle case: out/main/index.js → resolve from package
     // dir via the workspace symlink at <consumer>/node_modules/@nodalcore/plugin-host
-    path.resolve(path.dirname(here), '../../packages/plugin-host/dist/worker.js'),
-    path.resolve(path.dirname(here), '../node_modules/@nodalcore/plugin-host/dist/worker.js'),
+    path.resolve(here, '../../packages/plugin-host/dist/worker.js'),
+    path.resolve(here, '../node_modules/@nodalcore/plugin-host/dist/worker.js'),
   ]
   for (const candidate of candidates) {
     if (existsSync(candidate)) return candidate
   }
-  // Last-resort: ask Node's resolver via createRequire. Works whenever the
-  // host's node_modules tree includes @nodalcore/plugin-host.
+  // Last-resort: ask Node's resolver via createRequire (works in both ESM
+  // and CJS). The previous globalThis.require approach was wrong on two
+  // counts — `require` isn't on globalThis in stock Node CJS, and even if
+  // it were, calling it executes the worker module instead of returning a
+  // path string.
   try {
-    const requireFn = (
-      globalThis as { require?: (id: string) => unknown }
-    ).require as ((id: string) => string) | undefined
-    if (requireFn) return requireFn('@nodalcore/plugin-host/dist/worker.js')
+    const baseUrl = typeof __filename === 'string' ? __filename : import.meta.url
+    return createRequire(baseUrl).resolve('@nodalcore/plugin-host/dist/worker.js')
   } catch {
     // ignore
   }
