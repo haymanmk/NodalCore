@@ -7,20 +7,26 @@
     "dev": "pnpm --filter @nodalcore/desktop dev",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "sdk:publish-local": "pnpm --filter @nodalcore/sdk build && pnpm --filter @nodalcore/sdk exec yalc publish --push",
+    "sdk:remove-local": "pnpm --filter @nodalcore/sdk exec yalc installations clean @nodalcore/sdk"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^9.0.0",
     "prettier": "^3.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "yalc": "1.0.0-pre.53"
   },
   "engines": {
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "electron"]
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "electron"
+    ]
   }
 }

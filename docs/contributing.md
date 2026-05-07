@@ -100,6 +100,72 @@ The host-side configuration store is per-plugin
 straight from `manifest.contributes.configuration.properties` — never
 hand-coded in the renderer.
 
+## Developing a plugin outside the monorepo
+
+`@nodalcore/sdk` is not yet on npm. To author a plugin in a project
+that lives outside this repo, use [yalc](https://github.com/wclr/yalc)
+as a local registry. yalc survives `pnpm install` (unlike `pnpm link`,
+which gets clobbered) and works cleanly with this repo's tsup-bundled
+plugin layout.
+
+**One-time setup**, from this repo:
+
+```bash
+# Build the SDK and publish it to your machine's yalc store.
+# Re-run this every time you want consumers to pick up SDK changes.
+pnpm sdk:publish-local
+```
+
+That builds `packages/sdk` and runs `yalc publish --push`, which
+propagates to any external project that has already added the SDK via
+`yalc add`.
+
+**In your external plugin project:**
+
+```bash
+# Install yalc once (yalc itself is not on npm under @nodalcore;
+# install it globally or use npx):
+npm i -g yalc          # or: npx yalc add @nodalcore/sdk
+
+# First time only — registers @nodalcore/sdk in your project from
+# the local yalc store:
+yalc add @nodalcore/sdk
+pnpm install           # (or npm install / yarn) to wire up node_modules
+```
+
+After that, the iteration loop is:
+
+```
+[in NodalCore]              [in your plugin project]
+edit packages/sdk/src/...
+pnpm sdk:publish-local  ──► consumers auto-update via `yalc push`
+                            pnpm build  # rebundle your plugin
+```
+
+A few things to watch:
+
+- **Bundle the SDK into your plugin.** Use the tsup config from
+  [`plugin-packaging.md`](./plugin-packaging.md) (`noExternal: [/.*/]`
+  + the `createRequire` banner). The installed copy at
+  `~/.nodalcore/plugins/<id>/` is run against an empty
+  `node_modules` — anything not inlined will throw
+  `ERR_MODULE_NOT_FOUND` at activation.
+- **Match `sdkVersion`.** Your manifest's `sdkVersion` semver range
+  must satisfy `SDK_VERSION` in `packages/sdk/src/version.ts`. If you
+  bump the SDK locally, bump that constant too — the installer
+  rejects mismatches.
+- **Peer-style deps aren't auto-resolved.** yalc only ships
+  `@nodalcore/sdk`. If your plugin uses anything else from this repo
+  (e.g. `@nodalcore/renderer` for shared components), publish that
+  package with yalc the same way.
+- **Cleanup.** `pnpm sdk:remove-local` clears yalc's record of
+  consumers if your project tree gets out of sync; in the consumer,
+  `yalc remove @nodalcore/sdk` (or `yalc retreat`) drops the local
+  link and restores the registry version (none, currently).
+
+When the SDK is eventually published to npm, the only change in your
+external project is `yalc remove @nodalcore/sdk && pnpm add @nodalcore/sdk`.
+
 ## Updating the SDK
 
 Both reference plugins declare `"sdkVersion": "^0.2.0"`. The host

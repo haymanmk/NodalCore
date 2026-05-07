@@ -7,6 +7,10 @@ out/
 .DS_Store
 .github/prompts/
 
+# yalc local-publish artifacts (used when developing plugins outside the monorepo)
+.yalc/
+yalc.lock
+
 # Built bundle for the standalone-tool example (run `pnpm --filter example-image-processor build` to regenerate)
 examples/plugin-standalone-tool/bin/
 
