@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 import { fork, type ChildProcess } from 'node:child_process'
 import { PLUGINS_DIR, readAndValidateManifest } from './installer.js'
-import type { DevicePlugin, ConnectionOptions } from '@nodalcore/sdk'
+import type { DevicePlugin, ConnectionOptions, ConnectionType } from '@nodalcore/sdk'
 import { dispatchHostRequest } from './broker.js'
 
 interface IpcMessage {
@@ -18,6 +18,7 @@ interface IpcMessage {
 
 interface LoadedPlugin {
   pluginId: string
+  connectionType: ConnectionType
   process: ChildProcess
   pending: Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>
   nextSeq: number
@@ -43,6 +44,9 @@ export async function loadDevicePlugin(pluginId: string): Promise<DevicePlugin> 
   if (!manifest.main) {
     throw new Error(`Plugin ${pluginId} has no "main" field in nodal.json`)
   }
+  if (!manifest.connectionType) {
+    throw new Error(`Plugin ${pluginId} has no "connectionType" field in nodal.json`)
+  }
 
   const entryPath = path.resolve(pluginDir, manifest.main)
   const workerPath = locateWorker()
@@ -54,6 +58,7 @@ export async function loadDevicePlugin(pluginId: string): Promise<DevicePlugin> 
 
   const entry: LoadedPlugin = {
     pluginId,
+    connectionType: manifest.connectionType,
     process: child,
     pending: new Map(),
     nextSeq: 1,
@@ -103,7 +108,7 @@ function call(entry: LoadedPlugin, method: string, args: unknown): Promise<unkno
 
 function createProxy(entry: LoadedPlugin): DevicePlugin {
   return {
-    connectionType: 'serial',
+    connectionType: entry.connectionType,
     connect: (options: ConnectionOptions) => call(entry, 'connect', options) as Promise<void>,
     disconnect: () => call(entry, 'disconnect', null) as Promise<void>,
   } as unknown as DevicePlugin

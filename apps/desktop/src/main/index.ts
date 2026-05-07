@@ -190,8 +190,14 @@ function registerIpcHandlers() {
   })
 
   // Device-bridge plugins
-  safeHandle('device:connect', 'Connect device', async (_event, pluginId: string, _options: ConnectionOptions) => {
-    await loadDevicePlugin(pluginId)
+  safeHandle('device:connect', 'Connect device', async (_event, pluginId: string, options?: ConnectionOptions) => {
+    const proxy = await loadDevicePlugin(pluginId)
+    // The renderer doesn't currently surface a connection-options dialog, so
+    // `options` is typically undefined here. Pass an empty object through —
+    // plugins whose connect() ignores options keep working; plugins that need
+    // host/port (e.g. TCP) should read them from ctx.workspace.getConfiguration()
+    // until a Configure-and-Connect UI lands.
+    await proxy.connect((options ?? {}) as ConnectionOptions)
     return { success: true }
   })
 
