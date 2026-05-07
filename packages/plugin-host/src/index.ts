@@ -57,6 +57,12 @@ export { startHostApiGrpcServer } from './host-api/grpc-server.js'
 export type { HostApiGrpcServer } from './host-api/grpc-server.js'
 
 export { listContributions } from './contributions.js'
+
+export {
+  getConnectionOptions,
+  setConnectionOptions,
+  clearConnectionOptions,
+} from './connection-store.js'
 export type {
   AggregatedContributions,
   AggregatedTheme,
