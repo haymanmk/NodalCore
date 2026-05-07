@@ -2,7 +2,7 @@
   "id": "example-multimeter",
   "name": "Example Multimeter Bridge",
   "version": "0.1.0",
-  "sdkVersion": "^0.2.0",
+  "sdkVersion": "^0.3.0",
   "type": "device-bridge",
   "main": "dist/index.js",
   "icon": "icon.png",
