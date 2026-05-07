@@ -40,10 +40,12 @@ export type { HostHandler } from './broker.js'
 export {
   registerHostApiHandlers,
   setWindowMessageEmitter,
+  setModalDispatcher,
 } from './host-api/server.js'
 export type {
   WindowMessageEmitter,
   WindowMessagePayload,
+  ModalDispatcher,
 } from './host-api/server.js'
 
 export { startHostApiGrpcServer } from './host-api/grpc-server.js'
