@@ -37,6 +37,8 @@ export type {
   WorkspaceApi,
   ViewsApi,
   ViewMessageHandler,
+  ShowModalOptions,
+  ModalButton,
 } from './host/index.js'
 
 export {

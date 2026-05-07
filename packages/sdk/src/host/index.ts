@@ -5,6 +5,8 @@ export type {
   WorkspaceApi,
   ViewsApi,
   ViewMessageHandler,
+  ShowModalOptions,
+  ModalButton,
 } from './extension-context.js'
 export { createExtensionContext } from './extension-context.js'
 export { createIpcTransport } from './ipc-adapter.js'
