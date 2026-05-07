@@ -47,3 +47,5 @@ export {
   createExtensionContext,
   coalesceLastWins,
 } from './host/index.js'
+
+export { connectionSchemas } from './schemas/connection.js'
