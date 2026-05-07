@@ -216,8 +216,28 @@ encouraged for non-obvious changes — explain *why*, not *what*.
 ## Validation before reporting work as done
 
 - Run `pnpm typecheck` for any code change.
+- Run `pnpm test:run` if you touched anything covered by vitest tests
+  (currently: SDK transport calls, plugin-host modal dispatch, and the
+  desktop `window-state` / `notifications/queue` / `notifications/modal`
+  modules).
 - For UI changes, run `pnpm dev` and exercise the affected screen.
   Type-check passing ≠ feature working.
 - For plugin-host changes, exercise both example plugins
   (`examples/plugin-device-bridge` for fork-IPC, `examples/plugin-standalone-tool`
   for spawn + gRPC).
+
+## Background mode (Linux)
+
+The desktop app stays alive in the system tray when the user closes the
+window. On Linux, Electron's `Tray` requires `libappindicator3-1` (or
+`libayatana-appindicator3-1` on newer distros). On GNOME without the
+AppIndicator extension installed, the tray icon is invisible — the
+process keeps running but the user has no UI affordance.
+
+The app registers a single-instance lock as a fallback: re-running
+`nodalcore` from the terminal while it is running in the background
+calls the `'second-instance'` handler, which re-shows the main window.
+Document this to users on tray-less Linux sessions.
+
+To fully exit the app, use the tray menu's "Quit NodalCore" item —
+closing the window only hides it.

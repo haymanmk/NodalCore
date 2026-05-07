@@ -27,20 +27,92 @@ interface WindowApi {
     message: string,
     level?: 'info' | 'warning' | 'error',
   ): Promise<void>
+  showWarning(message: string, detail?: string): Promise<void>
+  showModal(options: ShowModalOptions): Promise<string>
 }
 ```
 
-`showMessage` raises a toast in the desktop renderer (bottom-right). In
-headless contexts (CLI, MCP) it currently logs to stderr.
+### `showMessage(message, level?)`
+
+Raises a toast in the desktop renderer (bottom-right). In headless
+contexts (CLI, MCP) it currently logs to stderr. Fire-and-forget.
 
 ```ts
 await ctx.window.showMessage('Connection lost', 'warning')
 ```
 
+When the desktop window is hidden (the user closed to tray), toasts are
+queued in main and flushed back to the renderer when the window is
+re-shown — none are lost, but they don't interrupt either.
+
 Routing: plugin → broker `window.showMessage` handler →
 `setWindowMessageEmitter` callback (the desktop main wires this to
 `mainWindow.webContents.send('host:window:showMessage', ...)`) → renderer's
 `HostMessageToast` component subscribes via `__nodalcore.onHostMessage`.
+
+### `showWarning(message, detail?)`
+
+Passive native dialog with a single OK button. Use for "you should look
+at this" events that are louder than a toast but don't require a decision
+from the user. Works regardless of whether the desktop window is visible.
+
+```ts
+await ctx.window.showWarning(
+  'Multimeter disconnected',
+  'The serial port closed unexpectedly. Reconnect from the Devices tab.',
+)
+```
+
+In CLI / headless contexts the default dispatcher logs via `console.warn`
+and returns immediately.
+
+### `showModal(options): Promise<string>`
+
+Interactive native dialog. Resolves with the `id` of the button the user
+clicked, or with the `cancel`-marked button's id if the user dismissed via
+Esc / the dialog's close button. If no button has `cancel: true` and the
+user dismisses, resolves with the id of the first button.
+
+```ts
+interface ShowModalOptions {
+  message: string
+  detail?: string
+  type?: 'info' | 'warning' | 'error' | 'question'
+  buttons?: ModalButton[]
+}
+
+interface ModalButton {
+  id: string                  // returned from showModal; never shown
+  label: string               // user-visible button label
+  default?: boolean           // highlighted as the default action (Enter)
+  cancel?: boolean            // returned on Esc / window-close dismiss
+}
+```
+
+```ts
+const choice = await ctx.window.showModal({
+  type: 'question',
+  message: 'Discard 4 unsaved readings?',
+  detail: 'This will clear the buffer for the current session.',
+  buttons: [
+    { id: 'discard', label: 'Discard', default: true },
+    { id: 'keep',    label: 'Keep',    cancel: true },
+  ],
+})
+
+if (choice === 'discard') { /* ... */ }
+```
+
+`buttons` is optional. Omitting it (or passing an empty array) defaults
+to a single OK button — `await ctx.window.showModal({ message: 'Done.' })`
+resolves to `'ok'`.
+
+Concurrent calls from any plugin are serialized FIFO so dialogs don't
+interleave.
+
+In CLI / headless contexts the default dispatcher logs and returns the
+`cancel`-marked button's id (or `'ok'` for empty buttons), so plugins
+awaiting user input don't deadlock.
 
 ## `ctx.workspace`
 
