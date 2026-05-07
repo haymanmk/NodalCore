@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import type { PluginManifest, SettingsRecord } from '@nodalcore/sdk'
+import type { ConnectionOptions, PluginManifest, SettingsRecord } from '@nodalcore/sdk'
 
 /**
  * Abstraction over the NodalCore IPC bridge.
@@ -25,7 +25,7 @@ interface NodalCoreBridge {
   listInstalled: () => Promise<InstalledPluginEntry[]>
   install: (idOrUrl: string) => Promise<void>
   uninstall: (id: string) => Promise<void>
-  connect: (id: string) => Promise<void>
+  connect: (id: string, options?: ConnectionOptions) => Promise<void>
   disconnect: (id: string) => Promise<void>
   startTool: (id: string) => Promise<void>
   stopTool: (id: string) => Promise<void>
@@ -33,6 +33,7 @@ interface NodalCoreBridge {
   writeSettings: (id: string, settings: Partial<SettingsRecord>) => Promise<void>
   onHostMessage?: (handler: (msg: HostWindowMessage) => void) => () => void
   signalReady?: () => Promise<void>
+  readConnection?: (id: string, expectedType: string) => Promise<ConnectionOptions | null>
 }
 
 function getBridge(): NodalCoreBridge {
@@ -79,10 +80,18 @@ export function usePluginBridge() {
     await refresh()
   }, [bridge, refresh])
 
-  const connect = useCallback(async (id: string) => {
-    await bridge.connect(id)
+  const connect = useCallback(async (id: string, options?: ConnectionOptions) => {
+    await bridge.connect(id, options)
     await refresh()
   }, [bridge, refresh])
+
+  const readConnection = useCallback(
+    async (id: string, expectedType: string): Promise<ConnectionOptions | null> => {
+      if (!bridge.readConnection) return null
+      return bridge.readConnection(id, expectedType)
+    },
+    [bridge],
+  )
 
   const disconnect = useCallback(async (id: string) => {
     await bridge.disconnect(id)
@@ -122,6 +131,7 @@ export function usePluginBridge() {
     stopTool,
     readSettings,
     writeSettings,
+    readConnection,
     refresh,
   }
 }

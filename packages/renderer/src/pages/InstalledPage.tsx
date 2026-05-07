@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { JSONSchema7 } from 'json-schema'
 import { usePluginBridge } from '../hooks/usePluginBridge.js'
 import { SettingsPanel } from '../components/SettingsPanel.js'
-import type { SettingsRecord } from '@nodalcore/sdk'
+import { ConnectDialog } from '../components/ConnectDialog.js'
+import { connectionSchemas } from '@nodalcore/sdk/schemas/connection'
+import type { ConnectionOptions, ConnectionType, SettingsRecord } from '@nodalcore/sdk'
 import type { PluginManifest } from '@nodalcore/sdk'
 
 function PluginIcon({ manifest }: { manifest: PluginManifest }) {
@@ -38,7 +40,37 @@ function configurationToSchema(
 }
 
 export function InstalledPage() {
-  const { installedPlugins, connect, disconnect, startTool, stopTool, writeSettings } = usePluginBridge()
+  const { installedPlugins, connect, disconnect, startTool, stopTool, writeSettings, readConnection } = usePluginBridge()
+
+  const [dialogFor, setDialogFor] = useState<{
+    pluginId: string
+    pluginName: string
+    connectionType: ConnectionType
+    initialOptions: ConnectionOptions | null
+  } | null>(null)
+
+  const onConnectClick = useCallback(
+    async (entry: { manifest: { id: string; name: string; connectionType?: string } }) => {
+      const ct = entry.manifest.connectionType
+      if (!ct || !(ct in connectionSchemas)) {
+        // Unknown/missing connectionType — fall back to no-options behaviour.
+        // Plugins can still log + use defaults inside their connect().
+        console.warn(
+          `[connect] no built-in schema for connectionType="${ct ?? '<unset>'}" on plugin ${entry.manifest.id}; opening with empty options`,
+        )
+        await connect(entry.manifest.id)
+        return
+      }
+      const initial = await readConnection(entry.manifest.id, ct)
+      setDialogFor({
+        pluginId: entry.manifest.id,
+        pluginName: entry.manifest.name,
+        connectionType: ct as ConnectionType,
+        initialOptions: initial,
+      })
+    },
+    [connect, readConnection],
+  )
 
   if (installedPlugins.length === 0) {
     return (
@@ -80,7 +112,7 @@ export function InstalledPage() {
                   entry.status === 'idle' || entry.status === 'error' ? (
                     <button
                       className="installed-page__btn installed-page__btn--connect"
-                      onClick={() => connect(entry.manifest.id)}
+                      onClick={() => onConnectClick(entry)}
                     >
                       Connect
                     </button>
@@ -124,6 +156,20 @@ export function InstalledPage() {
           </div>
         ))}
       </div>
+
+      {dialogFor && (
+        <ConnectDialog
+          pluginId={dialogFor.pluginId}
+          pluginName={dialogFor.pluginName}
+          connectionType={dialogFor.connectionType}
+          initialOptions={dialogFor.initialOptions}
+          onSubmit={async (options) => {
+            await connect(dialogFor.pluginId, options)
+            setDialogFor(null)
+          }}
+          onCancel={() => setDialogFor(null)}
+        />
+      )}
     </div>
   )
 }

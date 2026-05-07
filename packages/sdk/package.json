@@ -11,6 +11,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./schemas/connection": {
+      "types": "./dist/schemas/connection.d.ts",
+      "import": "./dist/schemas/connection.js",
+      "require": "./dist/schemas/connection.cjs"
     }
   },
   "files": ["dist", "src/proto"],

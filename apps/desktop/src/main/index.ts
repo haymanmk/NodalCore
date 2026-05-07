@@ -18,6 +18,8 @@ import {
   setWindowMessageEmitter,
   setModalDispatcher,
   listContributions,
+  getConnectionOptions,
+  setConnectionOptions,
 } from '@nodalcore/plugin-host'
 import type { ConnectionOptions } from '@nodalcore/sdk'
 import {
@@ -202,12 +204,11 @@ function registerIpcHandlers() {
   // Device-bridge plugins
   safeHandle('device:connect', 'Connect device', async (_event, pluginId: string, options?: ConnectionOptions) => {
     const proxy = await loadDevicePlugin(pluginId)
-    // The renderer doesn't currently surface a connection-options dialog, so
-    // `options` is typically undefined here. Pass an empty object through —
-    // plugins whose connect() ignores options keep working; plugins that need
-    // host/port (e.g. TCP) should read them from ctx.workspace.getConfiguration()
-    // until a Configure-and-Connect UI lands.
     await proxy.connect((options ?? {}) as ConnectionOptions)
+    // Persist only after a successful connect. Skips persistence when the
+    // renderer omitted options (legacy/no-dialog path) so we don't overwrite
+    // a good stored value with an empty fallback.
+    if (options) await setConnectionOptions(pluginId, options)
     return { success: true }
   })
 
@@ -215,6 +216,14 @@ function registerIpcHandlers() {
     await unloadDevicePlugin(pluginId)
     return { success: true }
   })
+
+  safeHandle(
+    'connection:read',
+    'Read stored connection options',
+    async (_event, pluginId: string, expectedType: string) => {
+      return getConnectionOptions(pluginId, expectedType)
+    },
+  )
 
   // Settings — backed by host-side configuration store (~/.nodalcore/configurations.json).
   // Settings are no longer plugin-resident; plugins read them via host.workspace.getConfiguration.
