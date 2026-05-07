@@ -8,7 +8,12 @@ export {
   PLUGINS_DIR,
 } from './installer.js'
 
-export { loadDevicePlugin, unloadDevicePlugin, sendToPlugin } from './loader.js'
+export {
+  loadDevicePlugin,
+  unloadDevicePlugin,
+  sendToPlugin,
+  listLoadedPlugins,
+} from './loader.js'
 
 export { spawnTool, stopTool, getRunningTool, listRunningTools } from './spawner.js'
 

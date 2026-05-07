@@ -1,9 +1,10 @@
 import path from 'node:path'
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
 import { fork, type ChildProcess } from 'node:child_process'
 import { PLUGINS_DIR, readAndValidateManifest } from './installer.js'
-import type { DevicePlugin, ConnectionOptions } from '@nodalcore/sdk'
+import type { DevicePlugin, ConnectionOptions, ConnectionType } from '@nodalcore/sdk'
 import { dispatchHostRequest } from './broker.js'
 
 interface IpcMessage {
@@ -17,6 +18,7 @@ interface IpcMessage {
 
 interface LoadedPlugin {
   pluginId: string
+  connectionType: ConnectionType
   process: ChildProcess
   pending: Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>
   nextSeq: number
@@ -42,6 +44,9 @@ export async function loadDevicePlugin(pluginId: string): Promise<DevicePlugin> 
   if (!manifest.main) {
     throw new Error(`Plugin ${pluginId} has no "main" field in nodal.json`)
   }
+  if (!manifest.connectionType) {
+    throw new Error(`Plugin ${pluginId} has no "connectionType" field in nodal.json`)
+  }
 
   const entryPath = path.resolve(pluginDir, manifest.main)
   const workerPath = locateWorker()
@@ -53,6 +58,7 @@ export async function loadDevicePlugin(pluginId: string): Promise<DevicePlugin> 
 
   const entry: LoadedPlugin = {
     pluginId,
+    connectionType: manifest.connectionType,
     process: child,
     pending: new Map(),
     nextSeq: 1,
@@ -102,7 +108,7 @@ function call(entry: LoadedPlugin, method: string, args: unknown): Promise<unkno
 
 function createProxy(entry: LoadedPlugin): DevicePlugin {
   return {
-    connectionType: 'serial',
+    connectionType: entry.connectionType,
     connect: (options: ConnectionOptions) => call(entry, 'connect', options) as Promise<void>,
     disconnect: () => call(entry, 'disconnect', null) as Promise<void>,
   } as unknown as DevicePlugin
@@ -111,10 +117,34 @@ function createProxy(entry: LoadedPlugin): DevicePlugin {
 export async function unloadDevicePlugin(pluginId: string): Promise<void> {
   const entry = loaded.get(pluginId)
   if (!entry) return
-  await call(entry, 'shutdown', null).catch(() => {})
+  // Order matters: shutdown sets pluginInstance = null in the worker, so a
+  // disconnect call after shutdown would throw "Plugin does not implement
+  // disconnect()". Close the device first, then deactivate, then kill.
   await call(entry, 'disconnect', null).catch(() => {})
+  await call(entry, 'shutdown', null).catch(() => {})
   entry.process.kill()
   loaded.delete(pluginId)
+}
+
+/**
+ * Plugin ids currently held in the in-memory loaded map. Used by the desktop
+ * shell to compute live "running" status for the Installed-page UI — the
+ * persisted registry only tracks install state, not runtime state.
+ */
+export function listLoadedPlugins(): string[] {
+  return Array.from(loaded.keys())
+}
+
+/**
+ * Resolve the directory of *this* module across both module formats.
+ * tsup's CJS emit replaces `import.meta` with an empty object literal, so
+ * `fileURLToPath(import.meta.url)` throws `ERR_INVALID_ARG_TYPE` at runtime.
+ * In CJS Node injects `__dirname` per-module, so we prefer it when defined
+ * and fall back to `import.meta.url` for the ESM path.
+ */
+function currentDir(): string {
+  if (typeof __dirname === 'string') return __dirname
+  return path.dirname(fileURLToPath(import.meta.url))
 }
 
 /**
@@ -127,27 +157,28 @@ export async function unloadDevicePlugin(pluginId: string): Promise<void> {
  * `src/worker.ts` is the file).
  */
 function locateWorker(): string {
-  const here = fileURLToPath(import.meta.url)
+  const here = currentDir()
   const candidates = [
     // tsup dist mode: dist/index.js → dist/worker.js
-    path.join(path.dirname(here), 'worker.js'),
+    path.join(here, 'worker.js'),
     // src mode: src/loader.ts → src/worker.ts (vitest, ts-node)
-    path.join(path.dirname(here), 'worker.ts'),
+    path.join(here, 'worker.ts'),
     // electron-vite bundle case: out/main/index.js → resolve from package
     // dir via the workspace symlink at <consumer>/node_modules/@nodalcore/plugin-host
-    path.resolve(path.dirname(here), '../../packages/plugin-host/dist/worker.js'),
-    path.resolve(path.dirname(here), '../node_modules/@nodalcore/plugin-host/dist/worker.js'),
+    path.resolve(here, '../../packages/plugin-host/dist/worker.js'),
+    path.resolve(here, '../node_modules/@nodalcore/plugin-host/dist/worker.js'),
   ]
   for (const candidate of candidates) {
     if (existsSync(candidate)) return candidate
   }
-  // Last-resort: ask Node's resolver via createRequire. Works whenever the
-  // host's node_modules tree includes @nodalcore/plugin-host.
+  // Last-resort: ask Node's resolver via createRequire (works in both ESM
+  // and CJS). The previous globalThis.require approach was wrong on two
+  // counts — `require` isn't on globalThis in stock Node CJS, and even if
+  // it were, calling it executes the worker module instead of returning a
+  // path string.
   try {
-    const requireFn = (
-      globalThis as { require?: (id: string) => unknown }
-    ).require as ((id: string) => string) | undefined
-    if (requireFn) return requireFn('@nodalcore/plugin-host/dist/worker.js')
+    const baseUrl = typeof __filename === 'string' ? __filename : import.meta.url
+    return createRequire(baseUrl).resolve('@nodalcore/plugin-host/dist/worker.js')
   } catch {
     // ignore
   }

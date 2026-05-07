@@ -8,6 +8,7 @@ import {
   loadDevicePlugin,
   unloadDevicePlugin,
   sendToPlugin,
+  listLoadedPlugins,
   spawnTool,
   stopTool,
   reconcileRegistry,
@@ -178,7 +179,16 @@ function safeHandle<Args extends unknown[]>(
 function registerIpcHandlers() {
   // Plugin management
   safeHandle('plugin:list', 'List plugins', async () => {
-    return listInstalledPlugins()
+    // Merge live runtime state into the persisted registry entries. The
+    // registry only records install state ('idle'); 'running' is computed
+    // from the loader's in-memory loaded map at request time.
+    const entries = await listInstalledPlugins()
+    const running = new Set(listLoadedPlugins())
+    return entries.map((entry) =>
+      running.has(entry.manifest.id)
+        ? { ...entry, status: 'running' as const }
+        : entry,
+    )
   })
 
   safeHandle('plugin:install', 'Install plugin', async (_event, idOrUrl: string) => {
@@ -190,8 +200,14 @@ function registerIpcHandlers() {
   })
 
   // Device-bridge plugins
-  safeHandle('device:connect', 'Connect device', async (_event, pluginId: string, _options: ConnectionOptions) => {
-    await loadDevicePlugin(pluginId)
+  safeHandle('device:connect', 'Connect device', async (_event, pluginId: string, options?: ConnectionOptions) => {
+    const proxy = await loadDevicePlugin(pluginId)
+    // The renderer doesn't currently surface a connection-options dialog, so
+    // `options` is typically undefined here. Pass an empty object through —
+    // plugins whose connect() ignores options keep working; plugins that need
+    // host/port (e.g. TCP) should read them from ctx.workspace.getConfiguration()
+    // until a Configure-and-Connect UI lands.
+    await proxy.connect((options ?? {}) as ConnectionOptions)
     return { success: true }
   })
 

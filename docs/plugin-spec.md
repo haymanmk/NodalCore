@@ -20,7 +20,7 @@ new field name when applicable.
   "id":          "com.example.my-sensor",   // reverse-domain, globally unique
   "name":        "My Sensor",
   "version":     "1.0.0",                   // semver
-  "sdkVersion":  "^0.2.0",                  // semver range of @nodalcore/sdk
+  "sdkVersion":  ">=0.2.0",                 // semver range of @nodalcore/sdk (see "SDK version compatibility")
   "type":        "device-bridge",           // or "standalone-tool"
   "permissions": ["serial"],                // see Permissions below
 
@@ -265,6 +265,29 @@ Every release of `@nodalcore/sdk` ships an `SDK_VERSION` constant
 declared `sdkVersion` range doesn't satisfy the host's `SDK_VERSION`. Bump
 that constant alongside `packages/sdk/package.json` on every SDK release —
 forgetting will silently let mismatched plugins install.
+
+### Recommended `sdkVersion` shape: `>=X.Y.Z`, not `^X.Y.Z`
+
+While the SDK is still on a `0.x` line, **prefer open-ended ranges
+(`">=0.2.0"`) over caret ranges (`"^0.2.0"`) in your manifest.** npm/semver
+treats the caret specially on `0.x` versions: `^0.2.0` expands to
+`>=0.2.0 <0.3.0`, so a host with `SDK_VERSION = '0.3.0'` will reject a
+plugin pinned to `^0.2.0` even though no breaking change occurred — every
+additive minor SDK release would otherwise force every plugin author to
+re-cut a manifest. With `>=0.2.0` your plugin rides forward through
+additive minors and is only rejected when the host's `SDK_VERSION` is
+actually older than what you need.
+
+Pin upward when you start using a feature that landed in a specific
+release. For example, a plugin that calls `ctx.window.showModal` (added
+in `0.3.0`) should declare `">=0.3.0"`. The reference plugins under
+`examples/` only use the `0.2.0` surface and therefore stay at
+`">=0.2.0"`.
+
+Once the SDK reaches `1.0.0`, the standard caret semantics become
+useful again: at that point `^1.2.0` (i.e. `>=1.2.0 <2.0.0`) is the
+right shape — the major axis becomes the only place breaking changes
+happen.
 
 ## Registry index entry
 
