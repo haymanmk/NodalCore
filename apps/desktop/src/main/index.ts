@@ -8,6 +8,7 @@ import {
   loadDevicePlugin,
   unloadDevicePlugin,
   sendToPlugin,
+  listLoadedPlugins,
   spawnTool,
   stopTool,
   reconcileRegistry,
@@ -178,7 +179,16 @@ function safeHandle<Args extends unknown[]>(
 function registerIpcHandlers() {
   // Plugin management
   safeHandle('plugin:list', 'List plugins', async () => {
-    return listInstalledPlugins()
+    // Merge live runtime state into the persisted registry entries. The
+    // registry only records install state ('idle'); 'running' is computed
+    // from the loader's in-memory loaded map at request time.
+    const entries = await listInstalledPlugins()
+    const running = new Set(listLoadedPlugins())
+    return entries.map((entry) =>
+      running.has(entry.manifest.id)
+        ? { ...entry, status: 'running' as const }
+        : entry,
+    )
   })
 
   safeHandle('plugin:install', 'Install plugin', async (_event, idOrUrl: string) => {

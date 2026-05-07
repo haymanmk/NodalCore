@@ -117,10 +117,22 @@ function createProxy(entry: LoadedPlugin): DevicePlugin {
 export async function unloadDevicePlugin(pluginId: string): Promise<void> {
   const entry = loaded.get(pluginId)
   if (!entry) return
-  await call(entry, 'shutdown', null).catch(() => {})
+  // Order matters: shutdown sets pluginInstance = null in the worker, so a
+  // disconnect call after shutdown would throw "Plugin does not implement
+  // disconnect()". Close the device first, then deactivate, then kill.
   await call(entry, 'disconnect', null).catch(() => {})
+  await call(entry, 'shutdown', null).catch(() => {})
   entry.process.kill()
   loaded.delete(pluginId)
+}
+
+/**
+ * Plugin ids currently held in the in-memory loaded map. Used by the desktop
+ * shell to compute live "running" status for the Installed-page UI — the
+ * persisted registry only tracks install state, not runtime state.
+ */
+export function listLoadedPlugins(): string[] {
+  return Array.from(loaded.keys())
 }
 
 /**
