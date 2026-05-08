@@ -10,13 +10,22 @@ export interface RegistryArtifact {
   url: string
   /** SHA-256 digest in `sha256:<hex>` format. */
   integrity: string
-  /** Target `process.platform` (e.g. "linux", "darwin", "win32"). */
-  os: 'aix' | 'android' | 'darwin' | 'freebsd' | 'haiku' | 'linux' | 'openbsd' | 'sunos' | 'win32' | 'cygwin' | 'netbsd'
-  /** Target `process.arch` (e.g. "x64", "arm64"). */
-  cpu: 'arm' | 'arm64' | 'ia32' | 'mips' | 'mipsel' | 'ppc' | 'ppc64' | 'riscv64' | 's390' | 's390x' | 'x64' | 'loong64'
-  /** Optional Linux libc selector. Ignored on non-Linux platforms. */
+  /**
+   * Target `process.platform` (e.g. "linux", "darwin", "win32").
+   * Omit to mark this artifact as compatible with **any** OS — useful for
+   * pure-JS bundles that have no native dependencies. An explicit match
+   * always wins over a universal entry (see `selectArtifact` scoring).
+   */
+  os?: 'aix' | 'android' | 'darwin' | 'freebsd' | 'haiku' | 'linux' | 'openbsd' | 'sunos' | 'win32' | 'cygwin' | 'netbsd'
+  /**
+   * Target `process.arch` (e.g. "x64", "arm64").
+   * Omit to mark this artifact as compatible with **any** CPU. An explicit
+   * match always wins over a universal entry.
+   */
+  cpu?: 'arm' | 'arm64' | 'ia32' | 'mips' | 'mipsel' | 'ppc' | 'ppc64' | 'riscv64' | 's390' | 's390x' | 'x64' | 'loong64'
+  /** Optional Linux libc selector. Ignored on non-Linux platforms. Omit to match any libc. */
   libc?: 'glibc' | 'musl'
-  /** Optional semver range describing the compatible Node.js runtime. */
+  /** Optional semver range describing the compatible Node.js runtime. Omit to match any version. */
   nodeRange?: string
   /** Optional byte size for display and validation. */
   size?: number

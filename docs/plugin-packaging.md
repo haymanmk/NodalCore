@@ -112,11 +112,34 @@ Field meanings:
 
 - `url`: direct download URL for the artifact
 - `integrity`: SHA-256 digest in `sha256:<hex>` format
-- `os`: target `process.platform`
-- `cpu`: target `process.arch`
-- `libc`: optional Linux libc selector, such as `glibc` or `musl`
-- `nodeRange`: optional compatible Node.js version range
+- `os`: optional target `process.platform`. Omit to mark the artifact as
+  compatible with **any OS** — useful for pure-JS bundles. An explicit
+  match always beats a universal entry.
+- `cpu`: optional target `process.arch`. Same "omit = any" semantics as
+  `os`.
+- `libc`: optional Linux libc selector, such as `glibc` or `musl`. Omit to
+  match any libc.
+- `nodeRange`: optional compatible Node.js version range. Omit to match
+  any Node version.
 - `size`: optional byte size for display and validation
+
+A pure-JS plugin can publish a single universal artifact by omitting both
+`os` and `cpu`:
+
+```jsonc
+{
+  "artifacts": [
+    {
+      "url": "https://registry.example.com/plugins/com.example.tool/1.0.0/universal.tgz",
+      "integrity": "sha256:<hex>"
+    }
+  ]
+}
+```
+
+Plugins with native dependencies should still ship one entry per
+OS/CPU/libc combination; those explicit entries will outscore any
+universal fallback during selection.
 
 Existing fields such as `repository` and `manifestUrl` should remain useful for
 source visibility and development, but registry installation should prefer a
@@ -194,11 +217,14 @@ relevant modules are:
     libc detection prefers `process.report.getReport().header.glibcVersionRuntime`
     and falls back to parsing `ldd --version`.
   - `selectArtifact(artifacts, platform?)` filters by OS+CPU first, then by
-    libc on Linux, then by `nodeRange` via `semver`. It returns `undefined`
-    when no OS/CPU match exists and throws `UnsupportedPlatformError` when
-    OS/CPU candidates exist but no candidate satisfies the libc / Node
-    constraints. Among matches, the most specific entry (libc + nodeRange
-    both set) wins.
+    libc on Linux, then by `nodeRange` via `semver`. Every axis treats a
+    missing field as "matches any value," so an artifact with no `os`/`cpu`
+    is universal. It returns `undefined` when every candidate has an
+    explicit OS or CPU that conflicts with the platform, and throws
+    `UnsupportedPlatformError` when OS/CPU candidates exist but none
+    satisfies the libc / Node constraints. Among matches, the most specific
+    entry wins — explicit os/cpu/libc/nodeRange each contribute a point;
+    a universal fallback only wins when nothing more specific qualifies.
   - `downloadArtifact(url, destPath)` streams `fetch` to disk via
     `stream/promises.pipeline`.
   - `verifyIntegrity(filePath, expected)` streams a SHA-256 hash and throws
@@ -244,7 +270,7 @@ relevant modules are:
 |--------------------------------------|-----------------------|
 | Git URL (`http(s)://`, `git@`)       | `git clone`           |
 | Existing local directory             | copy into staging, then atomic swap |
-| Registry id, entry has matching artifact   | download + verify + unpack |
+| Registry id, entry has matching artifact (explicit or universal) | download + verify + unpack |
 | Registry id, entry has artifacts but none match platform | `UnsupportedPlatformError` |
 | Registry id, entry has no `artifacts[]`     | clone `repository` (legacy) |
 
