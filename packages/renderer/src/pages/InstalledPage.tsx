@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { JSONSchema7 } from 'json-schema'
 import { usePluginBridge } from '../hooks/usePluginBridge.js'
 import { SettingsPanel } from '../components/SettingsPanel.js'
@@ -6,6 +6,16 @@ import { ConnectDialog } from '../components/ConnectDialog.js'
 import { connectionSchemas } from '@nodalcore/sdk/schemas/connection'
 import type { ConnectionOptions, ConnectionType, SettingsRecord } from '@nodalcore/sdk'
 import type { PluginManifest } from '@nodalcore/sdk'
+
+/** Reserved configuration key — kept in sync with packages/plugin-host/src/auto-start.ts. */
+const AUTO_START_KEY = 'autoStart'
+
+const HOST_AUTO_START_FIELD: JSONSchema7 = {
+  type: 'boolean',
+  title: 'Start automatically',
+  description: 'Bring this plugin up when NodalCore opens.',
+  default: false,
+}
 
 function PluginIcon({ manifest }: { manifest: PluginManifest }) {
   const [err, setErr] = useState(false)
@@ -33,14 +43,55 @@ function PluginIcon({ manifest }: { manifest: PluginManifest }) {
   )
 }
 
-function configurationToSchema(
-  cfg: NonNullable<NonNullable<PluginManifest['contributes']>['configuration']>,
-): JSONSchema7 {
-  return { type: 'object', title: cfg.title, properties: cfg.properties }
+function configurationToSchema(manifest: PluginManifest): JSONSchema7 {
+  const cfg = manifest.contributes?.configuration
+  const userProps = cfg?.properties ?? {}
+  // Inject the host-reserved autoStart field unless the plugin already
+  // declared one (so plugin authors can customise the default/title).
+  const properties = AUTO_START_KEY in userProps
+    ? userProps
+    : { ...userProps, [AUTO_START_KEY]: HOST_AUTO_START_FIELD }
+  return { type: 'object', title: cfg?.title ?? manifest.name, properties }
+}
+
+interface PluginSettingsProps {
+  pluginId: string
+  schema: JSONSchema7
+  onSubmit: (pluginId: string, settings: SettingsRecord) => Promise<void>
+  readSettings: (pluginId: string) => Promise<SettingsRecord>
+}
+
+/**
+ * Wrapper around SettingsPanel that loads stored settings per plugin so the
+ * form reflects what's currently saved (including the autoStart toggle).
+ * Without this, RJSF defaults always win and the user can't tell whether
+ * they've previously enabled auto-start.
+ */
+function PluginSettings({ pluginId, schema, onSubmit, readSettings }: PluginSettingsProps) {
+  const [formData, setFormData] = useState<SettingsRecord | undefined>(undefined)
+  const [loaded, setLoaded] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    readSettings(pluginId).then((data) => {
+      if (cancelled) return
+      setFormData(data)
+      setLoaded(true)
+    }).catch(() => { if (!cancelled) setLoaded(true) })
+    return () => { cancelled = true }
+  }, [pluginId, readSettings])
+  if (!loaded) return null
+  return (
+    <SettingsPanel
+      pluginId={pluginId}
+      schema={schema}
+      formData={formData}
+      onSubmit={onSubmit}
+    />
+  )
 }
 
 export function InstalledPage() {
-  const { installedPlugins, connect, disconnect, startTool, stopTool, writeSettings, readConnection } = usePluginBridge()
+  const { installedPlugins, connect, disconnect, startTool, stopTool, writeSettings, readSettings, readConnection } = usePluginBridge()
 
   const [dialogFor, setDialogFor] = useState<{
     pluginId: string
@@ -144,15 +195,20 @@ export function InstalledPage() {
               </div>
             </div>
 
-            {entry.status === 'running' && entry.manifest.contributes?.configuration && (
-              <SettingsPanel
-                pluginId={entry.manifest.id}
-                schema={configurationToSchema(entry.manifest.contributes.configuration)}
-                onSubmit={async (id: string, settings: SettingsRecord) => {
-                  await writeSettings(id, settings)
-                }}
-              />
-            )}
+            {/*
+              Always render — even idle plugins need their settings panel so
+              the user can toggle autoStart before the first manual connect.
+              The host persists writes regardless of running state and pushes
+              workspace.configurationChanged to plugins that ARE loaded.
+            */}
+            <PluginSettings
+              pluginId={entry.manifest.id}
+              schema={configurationToSchema(entry.manifest)}
+              readSettings={readSettings}
+              onSubmit={async (id, settings) => {
+                await writeSettings(id, settings)
+              }}
+            />
           </div>
         ))}
       </div>

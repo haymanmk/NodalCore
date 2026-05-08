@@ -134,8 +134,9 @@ vars:
 Activation sequence the tool must follow:
 
 1. Dial `localhost:NODALCORE_HOST_PORT` and build a gRPC HostAPI client.
-2. (Optional) call `host.window.showMessage` / `host.workspace.getConfiguration`
-   etc. as part of activation.
+2. (Optional) call any host method as part of activation —
+   `host.window.showMessage` / `showWarning` / `showModal`,
+   `host.workspace.getConfiguration`, etc.
 3. Start the tool's own service.
 4. Print **exactly** `NODALCORE_READY <port>\n` on stdout — `<port>` is the
    port the tool's service listens on.
@@ -213,7 +214,54 @@ when no value is stored.
 
 Settings live at `~/.nodalcore/configurations.json`, keyed by plugin id.
 Plugins read via `ctx.workspace.getConfiguration()` and write via
-`ctx.workspace.setConfiguration()`.
+`ctx.workspace.setConfiguration()`. The host pushes
+`workspace.configurationChanged` to running plugins after every write — see
+`packages/sdk/src/host/extension-context.ts` (`onDidChangeConfiguration`).
+
+#### Reserved key: `autoStart`
+
+`autoStart` is a host-reserved boolean key under `configuration.properties`.
+When effective-value is `true`, the host brings the plugin up automatically
+during `app.whenReady()`:
+
+- **device-bridge** — loads the worker and replays the last-used connection
+  options. If no connection has been saved yet, the host emits a warning
+  toast (`"connect once from the Installed page so the connection options
+  can be saved"`) and skips that plugin.
+- **standalone-tool** — `spawnTool(pluginId)` runs the executable.
+
+Per-plugin failures are caught and surfaced via toast; one bad plugin can't
+block the rest or delay app launch.
+
+**Effective-value precedence** (first match wins):
+
+1. `~/.nodalcore/configurations.json[pluginId].autoStart`, if set
+2. `manifest.contributes.configuration.properties.autoStart.default`, if the
+   plugin declared the key
+3. `false`
+
+Plugin authors can opt-in by declaring `autoStart` like any other property,
+choosing their own default and copy:
+
+```jsonc
+"contributes": {
+  "configuration": {
+    "properties": {
+      "autoStart": {
+        "type": "boolean",
+        "title": "Start with NodalCore",
+        "description": "Connect to the device as soon as the app launches",
+        "default": false
+      },
+      "unit": { /* ... */ }
+    }
+  }
+}
+```
+
+If the plugin doesn't declare `autoStart`, the host injects a default field
+into the rendered SettingsPanel so users can still toggle it. Either way the
+value is stored at `configurations.json[pluginId].autoStart`.
 
 ### `themes`
 

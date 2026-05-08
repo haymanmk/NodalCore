@@ -38,6 +38,17 @@ export {
 export type { ConfigurationChangeEmitter } from './configuration.js'
 
 export {
+  AUTO_START_KEY,
+  shouldAutoStart,
+  autoStartInstalledPlugins,
+} from './auto-start.js'
+export type {
+  AutoStartContext,
+  AutoStartDeps,
+  AutoStartLevel,
+} from './auto-start.js'
+
+export {
   registerHostHandler,
   dispatchHostRequest,
 } from './broker.js'

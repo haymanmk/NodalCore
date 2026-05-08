@@ -15,6 +15,7 @@ import {
   getConfiguration,
   setConfiguration,
   setConfigurationChangeEmitter,
+  autoStartInstalledPlugins,
   registerHostApiHandlers,
   setWindowMessageEmitter,
   setModalDispatcher,
@@ -143,6 +144,13 @@ app.whenReady().then(() => {
   createTray()
   createWindow()
 
+  // Fire-and-forget: bring up plugins flagged with autoStart. The orchestrator
+  // contains per-plugin failures; toasts queue while the renderer mounts and
+  // are flushed on host:ready, so we don't need to wait for the window here.
+  void autoStartInstalledPlugins({
+    emit: (level, message) => emitSystemToast(level, message),
+  })
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
@@ -163,11 +171,22 @@ app.whenReady().then(() => {
 const SYSTEM_TOAST_SOURCE = 'NodalCore'
 
 function emitSystemToast(level: 'info' | 'warning' | 'error', message: string) {
-  mainWindow?.webContents.send('host:window:showMessage', {
-    pluginId: SYSTEM_TOAST_SOURCE,
-    level,
-    message,
-  })
+  if (isWindowVisible()) {
+    mainWindow?.webContents.send('host:window:showMessage', {
+      pluginId: SYSTEM_TOAST_SOURCE,
+      level,
+      message,
+    })
+  } else {
+    // Auto-start (and any other pre-renderer host-side path) hits this branch.
+    // The renderer drains the queue via host:ready on mount.
+    enqueue({
+      pluginId: SYSTEM_TOAST_SOURCE,
+      message,
+      level,
+      ts: Date.now(),
+    })
+  }
 }
 
 // Wrap an IPC handler so any thrown error is surfaced to the user as an error
