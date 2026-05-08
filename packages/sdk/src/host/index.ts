@@ -5,6 +5,7 @@ export type {
   WorkspaceApi,
   ViewsApi,
   ViewMessageHandler,
+  ConfigurationChangeHandler,
   ShowModalOptions,
   ModalButton,
 } from './extension-context.js'

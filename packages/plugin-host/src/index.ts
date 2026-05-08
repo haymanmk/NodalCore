@@ -33,8 +33,9 @@ export {
   getConfiguration,
   setConfiguration,
   clearConfiguration,
-  CONFIG_FILE,
+  setConfigurationChangeEmitter,
 } from './configuration.js'
+export type { ConfigurationChangeEmitter } from './configuration.js'
 
 export {
   registerHostHandler,

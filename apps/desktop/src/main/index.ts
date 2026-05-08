@@ -14,6 +14,7 @@ import {
   reconcileRegistry,
   getConfiguration,
   setConfiguration,
+  setConfigurationChangeEmitter,
   registerHostApiHandlers,
   setWindowMessageEmitter,
   setModalDispatcher,
@@ -112,6 +113,17 @@ app.whenReady().then(() => {
     }
   })
   setModalDispatcher({ showWarning, showModal })
+  setConfigurationChangeEmitter(async (pluginId, newConfig) => {
+    try {
+      await sendToPlugin(pluginId, 'workspace.configurationChanged', newConfig)
+    } catch (err) {
+      // Plugin not loaded → nothing to notify; any other failure is logged
+      // by configuration.ts's catch wrapper.
+      if (!(err instanceof Error) || !err.message.includes('not loaded')) {
+        throw err
+      }
+    }
+  })
   registerProtocolHandler()
   registerWebviewRouting({
     invokeOnPlugin: async (pluginId, slotId, data) => {

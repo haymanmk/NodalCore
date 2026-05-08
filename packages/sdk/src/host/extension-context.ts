@@ -44,11 +44,28 @@ export interface ModalButton {
   cancel?: boolean
 }
 
+export type ConfigurationChangeHandler = (
+  newConfig: Record<string, unknown>,
+) => void | Promise<void>
+
 export interface WorkspaceApi {
   /** Read this plugin's persisted configuration from the host configuration store. */
   getConfiguration(): Promise<Record<string, unknown>>
   /** Merge values into this plugin's persisted configuration. */
   setConfiguration(values: Record<string, unknown>): Promise<void>
+  /**
+   * Subscribe to configuration changes pushed from the host. The handler
+   * receives the FULL post-merge configuration (not a delta) every time
+   * `setConfiguration` runs against this plugin id from any source — UI,
+   * CLI, MCP, or the plugin itself.
+   *
+   * Only the most recently registered handler is active; calling this again
+   * replaces the previous handler. To stop subscribing, pass `null`.
+   *
+   * Handlers should treat their own `setConfiguration` calls as potentially
+   * echoing back, and avoid unconditional re-writes from inside the handler.
+   */
+  onDidChangeConfiguration(handler: ConfigurationChangeHandler | null): void
 }
 
 export type ViewMessageHandler = (data: unknown) => unknown | Promise<unknown>
@@ -94,6 +111,15 @@ export function createExtensionContext(
   }
   transport.onRequest('views.message', inbound)
 
+  // Inbound: host pushes the new configuration after setConfiguration runs.
+  let configChangeHandler: ConfigurationChangeHandler | null = null
+  transport.onRequest('workspace.configurationChanged', async (args) => {
+    if (!configChangeHandler) return null
+    const newConfig = (args as Record<string, unknown> | undefined) ?? {}
+    await configChangeHandler(newConfig)
+    return null
+  })
+
   return {
     pluginId,
     window: {
@@ -114,6 +140,9 @@ export function createExtensionContext(
       },
       async setConfiguration(values) {
         await transport.request('workspace.setConfiguration', values)
+      },
+      onDidChangeConfiguration(handler) {
+        configChangeHandler = handler
       },
     },
     views: {
