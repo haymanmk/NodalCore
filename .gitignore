@@ -14,3 +14,6 @@ yalc.lock
 # Built bundle for the standalone-tool example (run `pnpm --filter example-image-processor build` to regenerate)
 examples/plugin-standalone-tool/bin/
 
+# superpowers brainstorm visual companion artifacts
+.superpowers/
+
