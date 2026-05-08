@@ -11,7 +11,8 @@
  */
 
 import * as http from 'node:http'
-import { createGrpcTransport, createExtensionContext } from '@nodalcore/sdk'
+import { createExtensionContext } from '@nodalcore/sdk'
+import { createGrpcTransport } from '@nodalcore/sdk/grpc'
 
 const PLUGIN_ID = process.env.NODALCORE_PLUGIN_ID ?? 'example-image-processor'
 const HOST_PORT = process.env.NODALCORE_HOST_PORT

@@ -1,11 +1,12 @@
 {
   "name": "@nodalcore/sdk",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "NodalCore plugin SDK — types, interfaces, and proto definitions for plugin developers",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -16,6 +17,11 @@
       "types": "./dist/schemas/connection.d.ts",
       "import": "./dist/schemas/connection.js",
       "require": "./dist/schemas/connection.cjs"
+    },
+    "./grpc": {
+      "types": "./dist/grpc.d.ts",
+      "import": "./dist/grpc.js",
+      "require": "./dist/grpc.cjs"
     }
   },
   "files": ["dist", "src/proto"],

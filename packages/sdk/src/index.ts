@@ -43,9 +43,11 @@ export type {
 
 export {
   createIpcTransport,
-  createGrpcTransport,
   createExtensionContext,
   coalesceLastWins,
 } from './host/index.js'
+// createGrpcTransport moved to '@nodalcore/sdk/grpc' so the bare entry stays
+// free of @grpc/grpc-js + @grpc/proto-loader for device-bridge plugins that
+// bundle the SDK with `noExternal: [/.*\/]`.
 
 export { connectionSchemas } from './schemas/connection.js'
