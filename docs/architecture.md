@@ -172,10 +172,11 @@ themselves (`ctx.window.showMessage`, `ctx.workspace.getConfiguration`,
 
 On the host side every inbound call lands in `broker.dispatchHostRequest`,
 regardless of which transport delivered it. This is the single
-source-of-truth router: `host-api/server.ts` registers `window.showMessage`
-and `workspace.{get,set}Configuration`; the webview routing module
-registers `views.postMessage`. Each handler is plugin-id-scoped — the
-broker never assumes one global state.
+source-of-truth router: `host-api/server.ts` registers
+`window.showMessage` / `window.showWarning` / `window.showModal` and
+`workspace.{get,set}Configuration`; the webview routing module registers
+`views.postMessage`. Each handler is plugin-id-scoped — the broker never
+assumes one global state.
 
 ```
                  ┌──────────────────────────────┐
@@ -187,6 +188,8 @@ broker never assumes one global state.
    from a fork worker                       from a standalone tool
                             ▲ ▲
             registerHostHandler('window.showMessage', …)
+            registerHostHandler('window.showWarning', …)
+            registerHostHandler('window.showModal',   …)
             registerHostHandler('workspace.getConfiguration', …)
             registerHostHandler('workspace.setConfiguration', …)
             registerHostHandler('views.postMessage', …)

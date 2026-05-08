@@ -61,6 +61,7 @@ pnpm format
 | Child-process isolation for plugins | Device-bridge plugins run in `fork()`-ed workers; a crash or hang does not take down the host |
 | Static JSON registry on GitHub Pages | Zero ops — registry updates land via PR; 5-min TTL client-side cache |
 | Mock registry fallback | `StorePage` falls back to `MOCK_REGISTRY` in `packages/renderer/src/mockRegistry.ts` when the live registry URL is unreachable (useful in dev) |
+| Background mode + native modal API | Closing the window hides to the system tray; the only exit path is the tray's "Quit" item. Plugins get `ctx.window.showWarning` (passive native dialog) and `ctx.window.showModal` (interactive, returns the chosen button id) on top of the existing `showMessage` toast. Modals serialize FIFO across plugins. Toasts emitted while the window is hidden are queued (cap 200, drop-oldest) and flushed on `host:ready`. |
 
 ## Plugin lifecycle (desktop)
 
@@ -78,7 +79,7 @@ User clicks Connect
       worker calls plugin's `activate(ctx)` if exported
       bidirectional IPC envelope { kind: 'request' | 'response', seq, … }
       plugin-side host requests routed through plugin-host/broker.ts
-      → host-api/server.ts handlers (window.showMessage, workspace.*)
+      → host-api/server.ts handlers (window.showMessage / showWarning / showModal, workspace.*)
 
 User edits settings → Apply
   → IPC: settings:write
@@ -116,7 +117,7 @@ Plugin → webview
 | `packages/plugin-host/src/installer.ts` | Install / uninstall, manifest validation, `sdkVersion` semver check, local registry at `~/.nodalcore/registry.json` |
 | `packages/plugin-host/src/configuration.ts` | Host-side settings store at `~/.nodalcore/configurations.json` |
 | `packages/plugin-host/src/broker.ts` | Single-source-of-truth router for plugin → host requests |
-| `packages/plugin-host/src/host-api/server.ts` | Registers `window.showMessage`, `workspace.getConfiguration`, `workspace.setConfiguration`; `setWindowMessageEmitter` lets the desktop shell forward toasts |
+| `packages/plugin-host/src/host-api/server.ts` | Registers `window.showMessage` / `showWarning` / `showModal`, `workspace.getConfiguration`, `workspace.setConfiguration`; `setWindowMessageEmitter` lets the desktop shell forward toasts; `setModalDispatcher` injects the native-dialog backend (default no-op for headless/CLI) |
 | `packages/plugin-host/src/loader.ts` | Fork + bidirectional IPC envelope for device-bridge plugins. Exports `sendToPlugin` so main can issue host → plugin requests (panel routing). |
 | `packages/plugin-host/src/spawner.ts` | Spawn + stdout handshake for standalone tools; starts the host gRPC server and passes `NODALCORE_HOST_PORT` to the child |
 | `packages/plugin-host/src/contributions.ts` | Aggregates `manifest.contributes` across installed plugins (themes with var maps loaded from disk, sidebar/statusBar slots, panel webviews) |
@@ -124,7 +125,11 @@ Plugin → webview
 | `packages/registry-client/src/index.ts` | `fetchIndex`, `searchPlugins`, `getPlugin` |
 | `packages/renderer/src/mockRegistry.ts` | 8 mock plugins shown when live registry is down |
 | `packages/renderer/src/hooks/usePluginBridge.ts` | Abstracts IPC bridge (Electron) vs. stub (web) |
-| `apps/desktop/src/main/index.ts` | All IPC handlers; wires `setWindowMessageEmitter` and webview routing |
+| `apps/desktop/src/main/index.ts` | All IPC handlers; wires `setWindowMessageEmitter`, `setModalDispatcher`, tray, and webview routing |
+| `apps/desktop/src/main/tray.ts` | System tray icon + Open/Quit menu; surfaces unread-toast count in tooltip / menu label |
+| `apps/desktop/src/main/window-state.ts` | Single source of truth for window visibility (`isWindowVisible`, `showWindow`, `hideWindow`, `beginQuit`); the close [X] handler hides to tray instead of quitting |
+| `apps/desktop/src/main/notifications/queue.ts` | In-memory queue (cap 200, drop-oldest) for `showMessage` toasts emitted while the window is hidden; drained on `host:ready` |
+| `apps/desktop/src/main/notifications/modal.ts` | Native dialog dispatcher backing `window.showWarning` / `window.showModal`; serializes concurrent calls FIFO via a single promise chain |
 | `apps/desktop/src/main/webviews/protocol.ts` | `nodal-plugin://` privileged-scheme registration + per-request handler with `..`/symlink defenses + per-plugin-origin CSP |
 | `apps/desktop/src/main/webviews/manager.ts` | `WebContentsView` lifecycle — create per (pluginId, slotId), single visible, bounds from renderer, hot-reload teardown |
 | `apps/desktop/src/main/webviews/routing.ts` | Bridges webview ↔ plugin via `webview:msg-to-plugin` / `views.postMessage` broker handler |

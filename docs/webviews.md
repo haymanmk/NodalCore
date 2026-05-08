@@ -177,7 +177,7 @@ APIs, it asks its plugin to do it.
 ```
 
 Both directions go through the **broker** — the same one that backs
-`host.window.showMessage` and `host.workspace.*`. Method names:
+`host.window.*` and `host.workspace.*`. Method names:
 
 - `views.message` — webview → plugin (host emits, plugin receives)
 - `views.postMessage` — plugin → webview (plugin emits, host routes)
