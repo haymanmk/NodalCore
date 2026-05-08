@@ -661,8 +661,46 @@ img.plugin-card__icon {
   background: var(--surface-raised);
 }
 
+/* RJSF v6 wraps the whole schema in a <fieldset> with a UA-default border
+   and a <legend> that duplicates the plugin name shown in the row above.
+   Zero out the chrome so the settings-panel's own 18px padding is the only
+   visible frame. */
+.settings-panel fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+/* Hide ONLY the outermost legend (which duplicates the plugin name). Nested
+   object groups in a schema get to keep their legends as section headings. */
+.settings-panel > form > .form-group.field-object > fieldset > legend {
+  display: none;
+}
+
+.settings-panel form > .form-group.field-object {
+  margin: 0;
+  padding: 0;
+}
+
+/* Nested-object legend treatment — when the plugin's schema groups properties
+   under a sub-object, render its title as a quiet section heading. */
+.settings-panel fieldset fieldset > legend {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0;
+  margin-bottom: 8px;
+}
+
 .settings-panel .field {
   margin-bottom: 14px;
+}
+
+.settings-panel .field:last-child {
+  margin-bottom: 0;
 }
 
 .settings-panel .control-label,
