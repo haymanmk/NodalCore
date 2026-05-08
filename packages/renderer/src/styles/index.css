@@ -1051,82 +1051,386 @@ img.plugin-card__icon {
 .connect-dialog__backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(8, 8, 14, 0.62);
+  backdrop-filter: blur(6px) saturate(115%);
+  -webkit-backdrop-filter: blur(6px) saturate(115%);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100;
+  animation: connect-dialog-backdrop-in 160ms ease-out;
+}
+
+@keyframes connect-dialog-backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .connect-dialog {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 1.5rem;
-  min-width: 24rem;
-  max-width: 32rem;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+  position: relative;
+  background:
+    radial-gradient(120% 120px at 50% -20px, rgba(99, 102, 241, 0.12), transparent 70%),
+    var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  width: min(28rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 4rem);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow:
+    0 30px 70px rgba(0, 0, 0, 0.55),
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 0 0 1px rgba(99, 102, 241, 0.04);
+  animation: connect-dialog-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes connect-dialog-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
+.connect-dialog::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(99, 102, 241, 0.55) 30%,
+    rgba(167, 139, 250, 0.55) 70%,
+    transparent
+  );
+  pointer-events: none;
+}
+
+.connect-dialog__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+  font-family: inherit;
+  transition: color var(--transition), border-color var(--transition), background var(--transition);
+  z-index: 1;
+}
+
+.connect-dialog__close:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.connect-dialog__close:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.connect-dialog__close:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .connect-dialog__header {
-  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 56px 16px 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.connect-dialog__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+}
+
+.connect-dialog__head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.connect-dialog__eyebrow {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-weight: 600;
 }
 
 .connect-dialog__title {
-  font-size: 1.1rem;
+  font-size: 17px;
+  font-weight: 600;
   margin: 0;
   color: var(--text-primary);
+  line-height: 1.2;
+  letter-spacing: -0.005em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.connect-dialog__sub {
-  font-size: 0.8rem;
+.connect-dialog__pill {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 10.5px;
   color: var(--text-secondary);
-  margin: 0.25rem 0 0;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  text-transform: lowercase;
+}
+
+.connect-dialog__pill::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+}
+
+/* RJSF body — extends the .settings-panel input treatment to dialog inputs.
+   RJSF v6 wraps the schema in: form > div.form-group.field-object > fieldset
+   > [child fields]. We zero out the fieldset chrome and apply padding to the
+   outer wrapper so the body scrolls between the header and footer. */
+.connect-dialog form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.connect-dialog form > .form-group.field-object {
+  padding: 18px 22px 4px;
+  overflow-y: auto;
+  flex: 1;
+  margin: 0;
+}
+
+.connect-dialog fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.connect-dialog .form-group.field {
+  margin-bottom: 14px;
+}
+
+.connect-dialog .control-label,
+.connect-dialog .connect-dialog label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  letter-spacing: 0.02em;
+}
+
+.connect-dialog .control-label .required {
+  color: var(--accent);
+  margin-left: 2px;
+  font-weight: 600;
+}
+
+.connect-dialog .field-description {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 0 0 6px;
+  line-height: 1.4;
+}
+
+.connect-dialog .form-control,
+.connect-dialog select,
+.connect-dialog textarea {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  font-family: inherit;
+}
+
+.connect-dialog .form-control:focus,
+.connect-dialog select:focus,
+.connect-dialog textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+/* RJSF gives every input/select/textarea the .form-control class. The base
+   rule above uses the (.form-control + select + textarea) selector which has
+   higher specificity than `.connect-dialog select` would on its own
+   (0,2,0 > 0,1,1) — so the chevron rule must include .form-control to win. */
+.connect-dialog select.form-control {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%238888a8' d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px;
+  padding-right: 30px;
+}
+
+.connect-dialog input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.connect-dialog .checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  margin: 0;
+}
+
+.connect-dialog .hidden { display: none; }
+
+.connect-dialog .has-error .form-control {
+  border-color: var(--error) !important;
+}
+
+.connect-dialog .error-detail,
+.connect-dialog .text-danger {
+  font-size: 11px;
+  color: var(--error);
+  margin-top: 4px;
+}
+
+/* RJSF wraps top-level errors in a panel — hide it; we surface errors via
+   the connect-dialog__error block below. */
+.connect-dialog .panel.panel-danger {
+  display: none;
+}
+
+.connect-dialog__error {
+  margin: 0 22px 4px;
+  padding: 10px 12px;
+  background: var(--error-bg);
+  color: var(--error);
+  border: 1px solid var(--error-border);
+  border-left: 3px solid var(--error);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  line-height: 1.45;
+  word-break: break-word;
 }
 
 .connect-dialog__footer {
+  margin-top: auto;
+  padding: 14px 22px 16px;
+  border-top: 1px solid var(--border);
   display: flex;
   justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 1rem;
+  gap: 8px;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.18));
 }
 
 .connect-dialog__btn {
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
+  padding: 7px 16px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background var(--transition), border-color var(--transition), box-shadow var(--transition), transform var(--transition);
 }
 
-.connect-dialog__btn--submit {
-  background: var(--accent);
-  color: white;
-  border-color: var(--accent);
-}
-
-.connect-dialog__btn--submit:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-
-.connect-dialog__btn--submit:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.connect-dialog__btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
 .connect-dialog__btn--cancel {
   background: transparent;
   color: var(--text-primary);
+  border-color: var(--border-strong);
 }
 
-.connect-dialog__error {
-  margin-top: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: 4px;
-  background: var(--error-bg);
-  color: var(--error);
-  border: 1px solid var(--error-border);
-  font-size: 0.85rem;
+.connect-dialog__btn--cancel:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.connect-dialog__btn--submit {
+  background: linear-gradient(180deg, var(--accent), #4f52e0);
+  color: white;
+  border-color: transparent;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 6px 18px rgba(99, 102, 241, 0.35);
+}
+
+.connect-dialog__btn--submit:hover:not(:disabled) {
+  background: linear-gradient(180deg, var(--accent-hover), var(--accent));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 8px 22px rgba(99, 102, 241, 0.45);
+}
+
+.connect-dialog__btn--submit:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.connect-dialog__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.connect-dialog__spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: white;
+  animation: connect-dialog-spin 0.7s linear infinite;
+}
+
+@keyframes connect-dialog-spin {
+  to { transform: rotate(360deg); }
 }

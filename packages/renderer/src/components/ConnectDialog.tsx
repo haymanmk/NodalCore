@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Form from '@rjsf/core'
 import type { IChangeEvent } from '@rjsf/core'
 import type { ValidatorType } from '@rjsf/utils'
@@ -17,6 +17,18 @@ export interface ConnectDialogProps {
   onSubmit: (options: ConnectionOptions) => Promise<void>
   /** User clicked Cancel or pressed Esc. */
   onCancel: () => void
+}
+
+function deriveIcon(name: string) {
+  const initials = name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0] ?? '')
+    .join('')
+    .toUpperCase()
+  const seed = name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) * 37
+  const hue = seed % 360
+  return { initials, hue }
 }
 
 export function ConnectDialog({
@@ -68,6 +80,8 @@ export function ConnectDialog({
     [connectionType, onSubmit],
   )
 
+  const { initials, hue } = useMemo(() => deriveIcon(pluginName), [pluginName])
+
   return (
     <div className="connect-dialog__backdrop" role="presentation">
       <div
@@ -77,11 +91,33 @@ export function ConnectDialog({
         aria-labelledby={`connect-dialog-title-${pluginId}`}
         ref={formRef}
       >
+        <button
+          type="button"
+          className="connect-dialog__close"
+          onClick={onCancel}
+          disabled={submitting}
+          aria-label="Close"
+        >
+          ×
+        </button>
+
         <header className="connect-dialog__header">
-          <h2 id={`connect-dialog-title-${pluginId}`} className="connect-dialog__title">
-            Connect — {pluginName}
-          </h2>
-          <p className="connect-dialog__sub">{connectionType.toUpperCase()} connection</p>
+          <div
+            className="connect-dialog__icon"
+            style={{
+              background: `linear-gradient(135deg, hsl(${hue} 60% 40%), hsl(${(hue + 40) % 360} 60% 40%))`,
+            }}
+            aria-hidden="true"
+          >
+            {initials}
+          </div>
+          <div className="connect-dialog__head-text">
+            <div className="connect-dialog__eyebrow">Connect device</div>
+            <h2 id={`connect-dialog-title-${pluginId}`} className="connect-dialog__title">
+              {pluginName}
+            </h2>
+            <span className="connect-dialog__pill">{connectionType}</span>
+          </div>
         </header>
 
         <Form
@@ -116,7 +152,14 @@ export function ConnectDialog({
               className="connect-dialog__btn connect-dialog__btn--submit"
               disabled={submitting}
             >
-              {submitting ? 'Connecting…' : 'Connect'}
+              {submitting ? (
+                <>
+                  <span className="connect-dialog__spinner" aria-hidden="true" />
+                  Connecting…
+                </>
+              ) : (
+                'Connect'
+              )}
             </button>
           </div>
         </Form>
