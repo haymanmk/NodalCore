@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
 import type { JSONSchema7 } from 'json-schema'
 import { usePluginBridge } from '../hooks/usePluginBridge.js'
 import { SettingsPanel } from '../components/SettingsPanel.js'
@@ -116,23 +116,24 @@ export function InstalledPage() {
     [connect, readConnection],
   )
 
-  const trimmed = query.trim().toLowerCase()
-  const visible = trimmed === ''
-    ? installedPlugins
-    : installedPlugins.filter((entry) => {
-        const m = entry.manifest
-        const typeWord = m.type === 'device-bridge' ? 'device' : 'tool'
-        const haystack = [
-          m.name,
-          m.id,
-          m.description ?? '',
-          m.connectionType ?? '',
-          typeWord,
-        ]
-          .join('\n')
-          .toLowerCase()
-        return haystack.includes(trimmed)
-      })
+  const visible = useMemo(() => {
+    const trimmed = query.trim().toLowerCase()
+    if (trimmed === '') return installedPlugins
+    return installedPlugins.filter((entry) => {
+      const m = entry.manifest
+      const typeWord = m.type === 'device-bridge' ? 'device' : 'tool'
+      const haystack = [
+        m.name,
+        m.id,
+        m.description ?? '',
+        m.connectionType ?? '',
+        typeWord,
+      ]
+        .join('\n')
+        .toLowerCase()
+      return haystack.includes(trimmed)
+    })
+  }, [installedPlugins, query])
 
   useEffect(() => {
     if (expandedId && !visible.some((e) => e.manifest.id === expandedId)) {
@@ -160,6 +161,7 @@ export function InstalledPage() {
         type="text"
         className="installed-page__search"
         placeholder="Search installed…"
+        aria-label="Search installed plugins"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
@@ -179,6 +181,8 @@ export function InstalledPage() {
           return (
             <div
               key={entry.manifest.id}
+              role="button"
+              tabIndex={0}
               className={
                 'installed-page__tile installed-page__tile--clickable' +
                 (isExpanded ? ' installed-page__tile--expanded' : '')
@@ -186,6 +190,12 @@ export function InstalledPage() {
               onClick={() =>
                 setExpandedId((cur) => (cur === entry.manifest.id ? null : entry.manifest.id))
               }
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  setExpandedId((cur) => (cur === entry.manifest.id ? null : entry.manifest.id))
+                }
+              }}
             >
               <div className="installed-page__tile-header">
                 <PluginIcon manifest={entry.manifest} />

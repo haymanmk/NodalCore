@@ -511,6 +511,12 @@ img.plugin-card__icon {
   box-shadow: 0 0 0 1px var(--accent) inset, var(--shadow-sm);
 }
 
+.installed-page__tile:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
 .installed-page__tile--clickable {
   cursor: pointer;
 }
@@ -608,52 +614,6 @@ img.plugin-card__icon {
   color: white;
 }
 
-.installed-page__item {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-  transition: border-color var(--transition);
-}
-
-.installed-page__item:hover {
-  border-color: var(--border-accent);
-}
-
-.installed-page__item-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 18px;
-}
-
-.installed-page__item-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  background: var(--surface-raised);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: 700;
-  color: white;
-  flex-shrink: 0;
-}
-
-.installed-page__item-icon img {
-  width: 36px;
-  height: 36px;
-  object-fit: cover;
-  display: block;
-}
-
-.installed-page__item-info {
-  flex: 1;
-  min-width: 0;
-}
-
 .installed-page__item-name {
   font-size: 14px;
   font-weight: 600;
@@ -722,13 +682,6 @@ img.plugin-card__icon {
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.4; }
-}
-
-.installed-page__item-actions {
-  display: flex;
-  gap: 8px;
-  margin-left: auto;
-  flex-shrink: 0;
 }
 
 .installed-page__btn {
