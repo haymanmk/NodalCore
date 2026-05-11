@@ -511,9 +511,9 @@ img.plugin-card__icon {
   box-shadow: 0 0 0 1px var(--accent) inset, var(--shadow-sm);
 }
 
-.installed-page__tile:focus-visible {
+.installed-page__tile-header:focus-visible {
   outline: none;
-  border-color: var(--accent);
+  border-radius: var(--radius);
   box-shadow: 0 0 0 3px var(--accent-light);
 }
 

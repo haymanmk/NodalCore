@@ -181,8 +181,6 @@ export function InstalledPage() {
           return (
             <div
               key={entry.manifest.id}
-              role="button"
-              tabIndex={0}
               className={
                 'installed-page__tile installed-page__tile--clickable' +
                 (isExpanded ? ' installed-page__tile--expanded' : '')
@@ -190,14 +188,18 @@ export function InstalledPage() {
               onClick={() =>
                 setExpandedId((cur) => (cur === entry.manifest.id ? null : entry.manifest.id))
               }
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  setExpandedId((cur) => (cur === entry.manifest.id ? null : entry.manifest.id))
-                }
-              }}
             >
-              <div className="installed-page__tile-header">
+              <div
+                className="installed-page__tile-header"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    setExpandedId((cur) => (cur === entry.manifest.id ? null : entry.manifest.id))
+                  }
+                }}
+              >
                 <PluginIcon manifest={entry.manifest} />
 
                 <div className="installed-page__tile-info">
