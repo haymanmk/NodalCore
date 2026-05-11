@@ -486,10 +486,64 @@ img.plugin-card__icon {
   font-size: 14px;
 }
 
-.installed-page__list {
+.installed-page__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.installed-page__tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.installed-page__tile:hover {
+  border-color: var(--border-accent);
+}
+
+.installed-page__tile-header {
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+}
+
+.installed-page__tile-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface-raised);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
+}
+
+.installed-page__tile-icon img {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  display: block;
+}
+
+.installed-page__tile-info {
+  min-width: 0;
+}
+
+.installed-page__tile-actions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  align-items: flex-end;
+  gap: 8px;
 }
 
 .installed-page__item {

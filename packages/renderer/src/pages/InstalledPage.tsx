@@ -29,7 +29,7 @@ function PluginIcon({ manifest }: { manifest: PluginManifest }) {
     const hue = (manifest.name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) * 37) % 360
     return (
       <div
-        className="installed-page__item-icon"
+        className="installed-page__tile-icon"
         style={{ background: `hsl(${hue} 60% 40%)` }}
       >
         {initials}
@@ -37,8 +37,8 @@ function PluginIcon({ manifest }: { manifest: PluginManifest }) {
     )
   }
   return (
-    <div className="installed-page__item-icon">
-      <img src={manifest.icon} alt="" width={36} height={36} onError={() => setErr(true)} />
+    <div className="installed-page__tile-icon">
+      <img src={manifest.icon} alt="" width={48} height={48} onError={() => setErr(true)} />
     </div>
   )
 }
@@ -128,44 +128,45 @@ export function InstalledPage() {
         <span className="installed-page__count">{installedPlugins.length} installed</span>
       </div>
 
-      <div className="installed-page__list">
-        {installedPlugins.map((entry) => (
-          <div key={entry.manifest.id} className="installed-page__item">
-            <div className="installed-page__item-header">
-              <PluginIcon manifest={entry.manifest} />
+      <div className="installed-page__grid">
+        {installedPlugins.map((entry) => {
+          const isDevice = entry.manifest.type === 'device-bridge'
+          const isStopped = entry.status === 'idle' || entry.status === 'error'
+          return (
+            <div key={entry.manifest.id} className="installed-page__tile">
+              <div className="installed-page__tile-header">
+                <PluginIcon manifest={entry.manifest} />
 
-              <div className="installed-page__item-info">
-                <div className="installed-page__item-name">{entry.manifest.name}</div>
-                <div className="installed-page__item-meta">
-                  v{entry.manifest.version} · {entry.manifest.type === 'device-bridge' ? 'Device' : 'Tool'}
-                  {entry.manifest.connectionType ? ` · ${entry.manifest.connectionType}` : ''}
+                <div className="installed-page__tile-info">
+                  <div className="installed-page__item-name">{entry.manifest.name}</div>
+                  <div className="installed-page__item-meta">
+                    v{entry.manifest.version} · {isDevice ? 'Device' : 'Tool'}
+                    {entry.manifest.connectionType ? ` · ${entry.manifest.connectionType}` : ''}
+                  </div>
                 </div>
-              </div>
 
-              <span className={`installed-page__status installed-page__status--${entry.status}`}>
-                <span className="installed-page__status-dot" />
-                {entry.status}
-              </span>
-
-              <div className="installed-page__item-actions">
-                {entry.manifest.type === 'device-bridge' ? (
-                  entry.status === 'idle' || entry.status === 'error' ? (
-                    <button
-                      className="installed-page__btn installed-page__btn--connect"
-                      onClick={() => onConnectClick(entry)}
-                    >
-                      Connect
-                    </button>
-                  ) : (
-                    <button
-                      className="installed-page__btn installed-page__btn--disconnect"
-                      onClick={() => disconnect(entry.manifest.id)}
-                    >
-                      Disconnect
-                    </button>
-                  )
-                ) : (
-                  entry.status === 'idle' || entry.status === 'error' ? (
+                <div className="installed-page__tile-actions">
+                  <span className={`installed-page__status installed-page__status--${entry.status}`}>
+                    <span className="installed-page__status-dot" />
+                    {entry.status}
+                  </span>
+                  {isDevice ? (
+                    isStopped ? (
+                      <button
+                        className="installed-page__btn installed-page__btn--connect"
+                        onClick={() => onConnectClick(entry)}
+                      >
+                        Connect
+                      </button>
+                    ) : (
+                      <button
+                        className="installed-page__btn installed-page__btn--disconnect"
+                        onClick={() => disconnect(entry.manifest.id)}
+                      >
+                        Disconnect
+                      </button>
+                    )
+                  ) : isStopped ? (
                     <button
                       className="installed-page__btn installed-page__btn--connect"
                       onClick={() => startTool(entry.manifest.id)}
@@ -179,31 +180,25 @@ export function InstalledPage() {
                     >
                       Stop
                     </button>
-                  )
-                )}
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/*
-              Always render — even idle plugins need their settings panel so
-              the user can toggle autoStart before the first manual connect.
-              The host persists writes regardless of running state and pushes
-              workspace.configurationChanged to plugins that ARE loaded.
-            */}
-            <SettingsPanel
-              pluginId={entry.manifest.id}
-              schema={configurationToSchema(entry.manifest)}
-              formData={formDataById[entry.manifest.id]}
-              onChange={(id, settings) =>
-                setFormDataById((prev) => ({ ...prev, [id]: settings }))
-              }
-              onSubmit={async (id, settings) => {
-                await writeSettings(id, settings)
-                setFormDataById((prev) => ({ ...prev, [id]: settings }))
-              }}
-            />
-          </div>
-        ))}
+              <SettingsPanel
+                pluginId={entry.manifest.id}
+                schema={configurationToSchema(entry.manifest)}
+                formData={formDataById[entry.manifest.id]}
+                onChange={(id, settings) =>
+                  setFormDataById((prev) => ({ ...prev, [id]: settings }))
+                }
+                onSubmit={async (id, settings) => {
+                  await writeSettings(id, settings)
+                  setFormDataById((prev) => ({ ...prev, [id]: settings }))
+                }}
+              />
+            </div>
+          )
+        })}
       </div>
 
       {dialogFor && (
