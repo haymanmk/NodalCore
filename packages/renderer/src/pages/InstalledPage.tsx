@@ -54,42 +54,6 @@ function configurationToSchema(manifest: PluginManifest): JSONSchema7 {
   return { type: 'object', title: cfg?.title ?? manifest.name, properties }
 }
 
-interface PluginSettingsProps {
-  pluginId: string
-  schema: JSONSchema7
-  onSubmit: (pluginId: string, settings: SettingsRecord) => Promise<void>
-  readSettings: (pluginId: string) => Promise<SettingsRecord>
-}
-
-/**
- * Wrapper around SettingsPanel that loads stored settings per plugin so the
- * form reflects what's currently saved (including the autoStart toggle).
- * Without this, RJSF defaults always win and the user can't tell whether
- * they've previously enabled auto-start.
- */
-function PluginSettings({ pluginId, schema, onSubmit, readSettings }: PluginSettingsProps) {
-  const [formData, setFormData] = useState<SettingsRecord | undefined>(undefined)
-  const [loaded, setLoaded] = useState(false)
-  useEffect(() => {
-    let cancelled = false
-    readSettings(pluginId).then((data) => {
-      if (cancelled) return
-      setFormData(data)
-      setLoaded(true)
-    }).catch(() => { if (!cancelled) setLoaded(true) })
-    return () => { cancelled = true }
-  }, [pluginId, readSettings])
-  if (!loaded) return null
-  return (
-    <SettingsPanel
-      pluginId={pluginId}
-      schema={schema}
-      formData={formData}
-      onSubmit={onSubmit}
-    />
-  )
-}
-
 export function InstalledPage() {
   const { installedPlugins, connect, disconnect, startTool, stopTool, writeSettings, readSettings, readConnection } = usePluginBridge()
 
@@ -99,6 +63,31 @@ export function InstalledPage() {
     connectionType: ConnectionType
     initialOptions: ConnectionOptions | null
   } | null>(null)
+
+  const [formDataById, setFormDataById] = useState<Record<string, SettingsRecord>>({})
+
+  useEffect(() => {
+    let cancelled = false
+    Promise.all(
+      installedPlugins.map(async (entry) => {
+        const data = await readSettings(entry.manifest.id).catch(() => ({}))
+        return [entry.manifest.id, data] as const
+      }),
+    ).then((pairs) => {
+      if (cancelled) return
+      setFormDataById((prev) => {
+        const next = { ...prev }
+        for (const [id, data] of pairs) {
+          // Only seed plugins we haven't touched yet — preserve unsaved drafts.
+          if (!(id in next)) next[id] = data
+        }
+        return next
+      })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [installedPlugins, readSettings])
 
   const onConnectClick = useCallback(
     async (entry: { manifest: { id: string; name: string; connectionType?: string } }) => {
@@ -201,12 +190,16 @@ export function InstalledPage() {
               The host persists writes regardless of running state and pushes
               workspace.configurationChanged to plugins that ARE loaded.
             */}
-            <PluginSettings
+            <SettingsPanel
               pluginId={entry.manifest.id}
               schema={configurationToSchema(entry.manifest)}
-              readSettings={readSettings}
+              formData={formDataById[entry.manifest.id]}
+              onChange={(id, settings) =>
+                setFormDataById((prev) => ({ ...prev, [id]: settings }))
+              }
               onSubmit={async (id, settings) => {
                 await writeSettings(id, settings)
+                setFormDataById((prev) => ({ ...prev, [id]: settings }))
               }}
             />
           </div>
