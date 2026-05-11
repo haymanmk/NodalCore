@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type MouseEvent } from 'react'
 import type { JSONSchema7 } from 'json-schema'
 import { usePluginBridge } from '../hooks/usePluginBridge.js'
 import { SettingsPanel } from '../components/SettingsPanel.js'
@@ -68,6 +68,8 @@ export function InstalledPage() {
 
   const [formDataById, setFormDataById] = useState<Record<string, SettingsRecord>>({})
 
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
   useEffect(() => {
     let cancelled = false
     Promise.all(
@@ -132,6 +134,12 @@ export function InstalledPage() {
         return haystack.includes(trimmed)
       })
 
+  useEffect(() => {
+    if (expandedId && !visible.some((e) => e.manifest.id === expandedId)) {
+      setExpandedId(null)
+    }
+  }, [visible, expandedId])
+
   if (installedPlugins.length === 0) {
     return (
       <div className="installed-page__empty">
@@ -166,8 +174,19 @@ export function InstalledPage() {
         {visible.map((entry) => {
           const isDevice = entry.manifest.type === 'device-bridge'
           const isStopped = entry.status === 'idle' || entry.status === 'error'
+          const isExpanded = expandedId === entry.manifest.id
+          const stop = (e: MouseEvent) => e.stopPropagation()
           return (
-            <div key={entry.manifest.id} className="installed-page__tile">
+            <div
+              key={entry.manifest.id}
+              className={
+                'installed-page__tile installed-page__tile--clickable' +
+                (isExpanded ? ' installed-page__tile--expanded' : '')
+              }
+              onClick={() =>
+                setExpandedId((cur) => (cur === entry.manifest.id ? null : entry.manifest.id))
+              }
+            >
               <div className="installed-page__tile-header">
                 <PluginIcon manifest={entry.manifest} />
 
@@ -179,7 +198,7 @@ export function InstalledPage() {
                   </div>
                 </div>
 
-                <div className="installed-page__tile-actions">
+                <div className="installed-page__tile-actions" onClick={stop}>
                   <span className={`installed-page__status installed-page__status--${entry.status}`}>
                     <span className="installed-page__status-dot" />
                     {entry.status}
@@ -188,14 +207,20 @@ export function InstalledPage() {
                     isStopped ? (
                       <button
                         className="installed-page__btn installed-page__btn--connect"
-                        onClick={() => onConnectClick(entry)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onConnectClick(entry)
+                        }}
                       >
                         Connect
                       </button>
                     ) : (
                       <button
                         className="installed-page__btn installed-page__btn--disconnect"
-                        onClick={() => disconnect(entry.manifest.id)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          disconnect(entry.manifest.id)
+                        }}
                       >
                         Disconnect
                       </button>
@@ -203,14 +228,20 @@ export function InstalledPage() {
                   ) : isStopped ? (
                     <button
                       className="installed-page__btn installed-page__btn--connect"
-                      onClick={() => startTool(entry.manifest.id)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        startTool(entry.manifest.id)
+                      }}
                     >
                       Start
                     </button>
                   ) : (
                     <button
                       className="installed-page__btn installed-page__btn--disconnect"
-                      onClick={() => stopTool(entry.manifest.id)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        stopTool(entry.manifest.id)
+                      }}
                     >
                       Stop
                     </button>
@@ -218,18 +249,23 @@ export function InstalledPage() {
                 </div>
               </div>
 
-              <SettingsPanel
-                pluginId={entry.manifest.id}
-                schema={configurationToSchema(entry.manifest)}
-                formData={formDataById[entry.manifest.id]}
-                onChange={(id, settings) =>
-                  setFormDataById((prev) => ({ ...prev, [id]: settings }))
-                }
-                onSubmit={async (id, settings) => {
-                  await writeSettings(id, settings)
-                  setFormDataById((prev) => ({ ...prev, [id]: settings }))
-                }}
-              />
+              {isExpanded && (
+                <div onClick={stop}>
+                  <hr className="installed-page__tile-divider" />
+                  <SettingsPanel
+                    pluginId={entry.manifest.id}
+                    schema={configurationToSchema(entry.manifest)}
+                    formData={formDataById[entry.manifest.id]}
+                    onChange={(id, settings) =>
+                      setFormDataById((prev) => ({ ...prev, [id]: settings }))
+                    }
+                    onSubmit={async (id, settings) => {
+                      await writeSettings(id, settings)
+                      setFormDataById((prev) => ({ ...prev, [id]: settings }))
+                    }}
+                  />
+                </div>
+              )}
             </div>
           )
         })}

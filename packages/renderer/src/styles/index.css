@@ -505,6 +505,22 @@ img.plugin-card__icon {
   border-color: var(--border-accent);
 }
 
+.installed-page__tile--expanded {
+  grid-column: 1 / -1;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset, var(--shadow-sm);
+}
+
+.installed-page__tile--clickable {
+  cursor: pointer;
+}
+
+.installed-page__tile-divider {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 0;
+}
+
 .installed-page__tile-header {
   display: grid;
   grid-template-columns: 48px 1fr auto;
