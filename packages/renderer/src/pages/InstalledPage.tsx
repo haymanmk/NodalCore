@@ -64,6 +64,8 @@ export function InstalledPage() {
     initialOptions: ConnectionOptions | null
   } | null>(null)
 
+  const [query, setQuery] = useState('')
+
   const [formDataById, setFormDataById] = useState<Record<string, SettingsRecord>>({})
 
   useEffect(() => {
@@ -112,6 +114,24 @@ export function InstalledPage() {
     [connect, readConnection],
   )
 
+  const trimmed = query.trim().toLowerCase()
+  const visible = trimmed === ''
+    ? installedPlugins
+    : installedPlugins.filter((entry) => {
+        const m = entry.manifest
+        const typeWord = m.type === 'device-bridge' ? 'device' : 'tool'
+        const haystack = [
+          m.name,
+          m.id,
+          m.description ?? '',
+          m.connectionType ?? '',
+          typeWord,
+        ]
+          .join('\n')
+          .toLowerCase()
+        return haystack.includes(trimmed)
+      })
+
   if (installedPlugins.length === 0) {
     return (
       <div className="installed-page__empty">
@@ -128,8 +148,22 @@ export function InstalledPage() {
         <span className="installed-page__count">{installedPlugins.length} installed</span>
       </div>
 
+      <input
+        type="text"
+        className="installed-page__search"
+        placeholder="Search installed…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+
+      {visible.length === 0 ? (
+        <div className="installed-page__no-match">
+          No installed plugins match &ldquo;{query}&rdquo;.
+          <button onClick={() => setQuery('')}>Clear</button>
+        </div>
+      ) : (
       <div className="installed-page__grid">
-        {installedPlugins.map((entry) => {
+        {visible.map((entry) => {
           const isDevice = entry.manifest.type === 'device-bridge'
           const isStopped = entry.status === 'idle' || entry.status === 'error'
           return (
@@ -200,6 +234,7 @@ export function InstalledPage() {
           )
         })}
       </div>
+      )}
 
       {dialogFor && (
         <ConnectDialog

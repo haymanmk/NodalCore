@@ -546,6 +546,52 @@ img.plugin-card__icon {
   gap: 8px;
 }
 
+.installed-page__search {
+  width: 100%;
+  margin-bottom: 14px;
+  padding: 9px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  transition: border-color var(--transition);
+}
+
+.installed-page__search::placeholder {
+  color: var(--text-muted);
+}
+
+.installed-page__search:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.installed-page__no-match {
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.installed-page__no-match button {
+  margin-left: 10px;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.installed-page__no-match button:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
 .installed-page__item {
   background: var(--surface);
   border: 1px solid var(--border);
