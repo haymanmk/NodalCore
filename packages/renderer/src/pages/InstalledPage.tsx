@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import type { JSONSchema7 } from 'json-schema'
 import { usePluginBridge } from '../hooks/usePluginBridge.js'
 import { SettingsPanel } from '../components/SettingsPanel.js'
@@ -69,6 +69,7 @@ export function InstalledPage() {
   const [formDataById, setFormDataById] = useState<Record<string, SettingsRecord>>({})
 
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const expandedTileRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -141,6 +142,27 @@ export function InstalledPage() {
     }
   }, [visible, expandedId])
 
+  // Collapse the expanded tile on outside click or Escape. Suppressed while
+  // ConnectDialog is open so clicks/keys inside the modal don't dismiss the
+  // tile underneath.
+  useEffect(() => {
+    if (!expandedId || dialogFor) return
+    const onMouseDown = (e: globalThis.MouseEvent) => {
+      const node = expandedTileRef.current
+      if (!node || !(e.target instanceof Node) || node.contains(e.target)) return
+      setExpandedId(null)
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setExpandedId(null)
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [expandedId, dialogFor])
+
   if (installedPlugins.length === 0) {
     return (
       <div className="installed-page__empty">
@@ -181,6 +203,7 @@ export function InstalledPage() {
           return (
             <div
               key={entry.manifest.id}
+              ref={isExpanded ? expandedTileRef : null}
               className={
                 'installed-page__tile installed-page__tile--clickable' +
                 (isExpanded ? ' installed-page__tile--expanded' : '')
