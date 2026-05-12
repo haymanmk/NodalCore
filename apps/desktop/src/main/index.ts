@@ -36,6 +36,7 @@ import {
   showPanel,
   hideActive,
   destroy as destroyPanel,
+  destroyForPlugin,
 } from './webviews/manager.js'
 import { registerWebviewRouting } from './webviews/routing.js'
 import { createTray } from './tray.js'
@@ -239,11 +240,16 @@ function registerIpcHandlers() {
   })
 
   safeHandle('plugin:install', 'Install plugin', async (_event, idOrUrl: string) => {
-    return installPlugin({ source: idOrUrl })
+    const result = await installPlugin({ source: idOrUrl })
+    mainWindow?.webContents.send('contributions:changed')
+    return result
   })
 
   safeHandle('plugin:uninstall', 'Uninstall plugin', async (_event, pluginId: string) => {
-    return uninstallPlugin(pluginId)
+    const result = await uninstallPlugin(pluginId)
+    destroyForPlugin(pluginId)
+    mainWindow?.webContents.send('contributions:changed')
+    return result
   })
 
   // Device-bridge plugins

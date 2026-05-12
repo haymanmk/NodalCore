@@ -45,6 +45,15 @@ contextBridge.exposeInMainWorld('__nodalcore', {
 
   getContributions: () => ipcRenderer.invoke('contributions:list'),
 
+  /** Subscribe to registry-change events emitted after install/uninstall. Returns an unsubscribe fn. */
+  onContributionsChanged: (handler: () => void) => {
+    const listener = () => handler()
+    ipcRenderer.on('contributions:changed', listener)
+    return () => {
+      ipcRenderer.off('contributions:changed', listener)
+    }
+  },
+
   showPanel: (pluginId: string, slotId: string, htmlPath: string) =>
     ipcRenderer.invoke('workspace:show-panel', pluginId, slotId, htmlPath),
 

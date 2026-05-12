@@ -118,6 +118,13 @@ export function destroy(pluginId: string, slotId: string): void {
   if (activeKey === key) activeKey = null
 }
 
+export function destroyForPlugin(pluginId: string): void {
+  for (const entry of [...views.values()]) {
+    if (entry.pluginId !== pluginId) continue
+    destroy(entry.pluginId, entry.slotId)
+  }
+}
+
 export function destroyAll(): void {
   for (const entry of views.values()) {
     byWebContentsId.delete(entry.view.webContents.id)

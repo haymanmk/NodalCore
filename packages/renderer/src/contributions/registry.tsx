@@ -65,6 +65,7 @@ const ContributionsContext = createContext<ContributionsContextValue>({
 
 interface BridgeWithContributions {
   getContributions?: () => Promise<AggregatedContributions>
+  onContributionsChanged?: (handler: () => void) => () => void
 }
 
 function getBridge(): BridgeWithContributions | undefined {
@@ -97,6 +98,11 @@ export function ContributionsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void refresh()
+    const bridge = getBridge()
+    if (!bridge?.onContributionsChanged) return
+    return bridge.onContributionsChanged(() => {
+      void refresh()
+    })
   }, [refresh])
 
   const value = useMemo(
