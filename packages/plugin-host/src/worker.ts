@@ -10,6 +10,7 @@
  * plugin → host direction through `ExtensionContext`, never directly.
  */
 
+import { pathToFileURL } from 'node:url'
 import { createIpcTransport, createExtensionContext } from '@nodalcore/sdk'
 
 const entryPath = process.argv[2]
@@ -19,6 +20,12 @@ if (!entryPath) {
   process.send?.({ kind: 'response', seq: 0, error: 'No entry path provided' })
   process.exit(1)
 }
+
+// Dynamic `import()` requires a URL. On Windows an absolute path like
+// `C:\…\main.js` is parsed with scheme `c:`, which throws
+// ERR_INVALID_URL_SCHEME. `pathToFileURL` produces a valid `file://` URL on
+// every platform.
+const entryUrl = pathToFileURL(entryPath).href
 
 const transport = createIpcTransport()
 
@@ -31,7 +38,7 @@ let pluginInstance: Partial<ConnectablePlugin> | null = null
 let deactivateFn: (() => unknown | Promise<unknown>) | null = null
 
 transport.onRequest('init', async () => {
-  const mod = await import(entryPath)
+  const mod = await import(entryUrl)
   const ctor = mod.default ?? mod
   pluginInstance = (typeof ctor === 'function' ? new ctor() : ctor) as Partial<ConnectablePlugin>
 
