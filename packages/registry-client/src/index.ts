@@ -18,6 +18,18 @@ let cachedIndex: RegistryIndex | null = null
 let cachedAt = 0
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 
+export type Fetcher = (input: string, init?: { signal?: AbortSignal }) => Promise<Response>
+
+// Indirection so Electron's main process can swap in `net.fetch` — that path
+// uses Chromium's TLS stack and the OS root store, which is required on
+// corporate Windows machines whose TLS-intercepting proxy presents a CA Node
+// doesn't trust out of the box.
+let currentFetch: Fetcher = (input, init) => globalThis.fetch(input, init)
+
+export function setFetcher(fn: Fetcher): void {
+  currentFetch = fn
+}
+
 export interface FetchOptions {
   registryUrl?: string
   /** Force bypass cache */
@@ -35,7 +47,7 @@ export async function fetchIndex(options: FetchOptions = {}): Promise<RegistryIn
     return cachedIndex
   }
 
-  const response = await fetch(url, { signal: options.signal })
+  const response = await currentFetch(url, { signal: options.signal })
   if (!response.ok) {
     throw new Error(`Registry fetch failed: ${response.status} ${response.statusText}`)
   }

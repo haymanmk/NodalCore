@@ -24,10 +24,11 @@ export {
   downloadArtifact,
   verifyIntegrity,
   unpackArtifact,
+  setFetcher,
   UnsupportedPlatformError,
   IntegrityError,
 } from './artifact.js'
-export type { PlatformDescriptor } from './artifact.js'
+export type { PlatformDescriptor, Fetcher } from './artifact.js'
 
 export {
   getConfiguration,

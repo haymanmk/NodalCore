@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, net } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import path from 'node:path'
 import {
@@ -22,7 +22,9 @@ import {
   listContributions,
   getConnectionOptions,
   setConnectionOptions,
+  setFetcher as setArtifactFetcher,
 } from '@nodalcore/plugin-host'
+import { setFetcher as setRegistryFetcher } from '@nodalcore/registry-client'
 import type { ConnectionOptions } from '@nodalcore/sdk'
 import {
   registerSchemePrivileges,
@@ -99,6 +101,18 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Route registry + artifact downloads through Electron's net stack so TLS
+  // verification consults the OS root store. This is what makes plugin
+  // installs work on corporate Windows machines whose proxy MITMs TLS with a
+  // company-internal root CA (the CA is in the Windows cert store but Node's
+  // bundled CA list doesn't know about it).
+  const electronFetch = net.fetch.bind(net) as (
+    input: string,
+    init?: { signal?: AbortSignal },
+  ) => Promise<Response>
+  setRegistryFetcher(electronFetch)
+  setArtifactFetcher(electronFetch)
+
   reconcileRegistry().catch(console.error)
   registerHostApiHandlers()
   setWindowMessageEmitter((pluginId, payload) => {

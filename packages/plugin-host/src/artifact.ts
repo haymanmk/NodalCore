@@ -125,8 +125,20 @@ export async function hashFile(filePath: string): Promise<string> {
   return `sha256:${hash.digest('hex')}`
 }
 
+export type Fetcher = (input: string, init?: { signal?: AbortSignal }) => Promise<Response>
+
+// Indirection so Electron's main process can swap in `net.fetch` — that path
+// uses Chromium's TLS stack and the OS root store, which is required on
+// corporate Windows machines whose TLS-intercepting proxy presents a CA Node
+// doesn't trust out of the box.
+let currentFetch: Fetcher = (input, init) => globalThis.fetch(input, init)
+
+export function setFetcher(fn: Fetcher): void {
+  currentFetch = fn
+}
+
 export async function downloadArtifact(url: string, destPath: string): Promise<void> {
-  const response = await fetch(url)
+  const response = await currentFetch(url)
   if (!response.ok) {
     throw new Error(`Artifact download failed: ${response.status} ${response.statusText}`)
   }
