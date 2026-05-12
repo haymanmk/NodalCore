@@ -48,8 +48,10 @@ pnpm format
 ```
 
 > **Important:** `ELECTRON_RUN_AS_NODE=1` is set by Claude Code's environment and
-> makes Electron behave like plain Node.js. The desktop dev script unsets it:
-> `ELECTRON_RUN_AS_NODE= electron-vite dev`. Do not remove this prefix.
+> makes Electron behave like plain Node.js. The desktop `dev` script routes
+> through `apps/desktop/scripts/dev.mjs`, which `delete`s that env var before
+> spawning `electron-vite dev`. This works identically on POSIX and Windows;
+> do not bypass the wrapper.
 
 ## Key architectural decisions
 

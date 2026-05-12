@@ -62,9 +62,11 @@ pnpm typecheck              # type-check everything
 pnpm lint                   # lint
 ```
 
-> **Heads up:** if your environment sets `ELECTRON_RUN_AS_NODE=1`, the
-> desktop dev script unsets it for you (`ELECTRON_RUN_AS_NODE= electron-vite
-> dev`).
+> **Heads up:** if your environment sets `ELECTRON_RUN_AS_NODE=1`, the desktop
+> dev script clears it for you through a small Node wrapper
+> (`apps/desktop/scripts/dev.mjs`) that runs `delete process.env.ELECTRON_RUN_AS_NODE`
+> before launching `electron-vite dev`. Works identically on POSIX shells and
+> Windows.
 
 ## Repo layout
 

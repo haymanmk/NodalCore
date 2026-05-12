@@ -40,8 +40,11 @@ pnpm build    # electron-vite build → out/
 pnpm preview  # run the built app
 ```
 
-> The `dev` script explicitly unsets `ELECTRON_RUN_AS_NODE` because Claude
-> Code sets it to `1`, which causes Electron to behave like plain Node.js.
+> The `dev` script runs `scripts/dev.mjs`, which `delete`s
+> `ELECTRON_RUN_AS_NODE` from the child environment before spawning
+> `electron-vite dev`. Claude Code presets that var to `1`, which makes
+> Electron boot as plain Node.js; the wrapper removes that ambiguity
+> identically on POSIX shells and Windows.
 
 ## IPC surface
 
